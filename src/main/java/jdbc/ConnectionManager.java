@@ -35,7 +35,7 @@ public class ConnectionManager {
         connect();
         patientMan = new JDBCPatientManager(this);
         userMan = new JDBCUserManager(this);
-        ensureSchema();
+        ensureSchema(c);
     }
 
     private void connect() {
@@ -52,7 +52,7 @@ public class ConnectionManager {
         }
     }
 
-    public void ensureSchema() {
+    public void ensureSchema( Connection c) {
         try (Statement st = c.createStatement()) {
 
             DatabaseMetaData meta = c.getMetaData();
