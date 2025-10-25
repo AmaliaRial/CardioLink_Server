@@ -1,6 +1,6 @@
 package pojos;
 
-import common.enums.Sex;
+import pojos.enums.Sex;
 
 import java.util.Date;
 import java.util.List;
