@@ -10,6 +10,9 @@ public class Symptoms {
         this.idSymptom = idSymptom;
         this.nameSymptom = nameSymptom;
     }
+    public Symptoms(int idSymptom) {
+        this.idSymptom = idSymptom;
+    }
 
     public int getIdSymptom() {
         return idSymptom;
