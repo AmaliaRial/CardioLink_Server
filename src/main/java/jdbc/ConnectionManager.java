@@ -59,7 +59,6 @@ public class ConnectionManager {
             String createTablePatients =
                     "CREATE TABLE IF NOT EXISTS patients (" +
                             "  idPatient INTEGER PRIMARY KEY AUTOINCREMENT," +
-                            "  usernamePatient TEXT UNIQUE NOT NULL," +
                             "  namePatient TEXT NOT NULL," +
                             "  surnamePatient TEXT NOT NULL," +
                             "  dniPatient TEXT UNIQUE NOT NULL," +
@@ -68,8 +67,7 @@ public class ConnectionManager {
                             "  sexPatient TEXT NOT NULL," +
                             "  phoneNumberPatient INTEGER UNIQUE NOT NULL," +
                             "  healthInsuranceNumberPatient INTEGER UNIQUE NOT NULL," +
-                            "  emergencyContactPatient INTEGER NOT NULL," +
-                            "  passwordPatient TEXT NOT NULL" +
+                            "  emergencyContactPatient INTEGER NOT NULL" +
                             ");";
             st.executeUpdate(createTablePatients);
 

@@ -317,7 +317,7 @@ public class ServerThread {
         private void handleSignup() throws Exception {
             // Read payload in same order sent by client
             String username = inputStream.readUTF();
-            String password = inputStream.readUTF(); // server must hash + salt before storing
+            String password = inputStream.readUTF();
             String name = inputStream.readUTF();
             String surname = inputStream.readUTF();
             String birthday = inputStream.readUTF();
@@ -349,9 +349,6 @@ public class ServerThread {
             }
 
             Patient p = new Patient();
-            p.setUsernamePatient(username);
-            String encryptedPass = Encryption.encrypt(password, PUBLIC_KEY);
-            p.setPasswordPatient(encryptedPass);
             p.setNamePatient(name);
             p.setSurnamePatient(surname);
             p.setEmailPatient(email);
@@ -362,9 +359,11 @@ public class ServerThread {
             p.setDobPatient(new java.text.SimpleDateFormat("yyyy-MM-dd").parse(birthday));
             p.setEmergencyContactPatient(Integer.parseInt(emergencyContact));
 
+
+            String encryptedPass = Encryption.encrypt(password, PUBLIC_KEY);
             try {
                 patientMan.addPatient(p);
-                userMan.register(username, password, "PATIENT");
+                userMan.register(username, encryptedPass, "PATIENT");
                 outputStream.writeUTF("ACK");
                 outputStream.writeUTF("Sign up successful. You can log in now.");
                 outputStream.flush();
