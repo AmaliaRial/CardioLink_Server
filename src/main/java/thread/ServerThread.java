@@ -4,6 +4,7 @@ import jdbc.*;
 import pojos.DiagnosisFile;
 import pojos.Patient;
 import pojos.Symptoms;
+import pojos.User;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -31,7 +32,7 @@ public class ServerThread {
 
 
     public static void main(String[] args) throws IOException, SQLException {
-        JDBCUserManager userMan = new JDBCUserManager(conman, PRIVATE_KEY);
+        JDBCUserManager userMan = new JDBCUserManager(conman);
 
         try (Connection connection = DriverManager.getConnection(DataBase_Address)){
             System.out.println("Connection to database established.");
@@ -157,7 +158,7 @@ public class ServerThread {
                 conMan = new ConnectionManager();
                 patientMan = new JDBCPatientManager(conMan);
                 doctorMan = new JDBCDoctorManager(conMan);
-                userMan = new JDBCUserManager(conMan, PRIVATE_KEY);
+                userMan = new JDBCUserManager(conMan);
                 String clientType = inputStream.readUTF();
                 if(clientType.equalsIgnoreCase("Patient")){
                     System.out.println("Is a patient");
@@ -235,7 +236,7 @@ public class ServerThread {
             this.patientMan = new JDBCPatientManager(conMan);
             this.doctorMan = new JDBCDoctorManager(conMan);
             this.conMan = conMan;
-            this.userMan = new JDBCUserManager(conMan, PRIVATE_KEY);
+            this.userMan = new JDBCUserManager(conMan);
         }
 
 
@@ -380,7 +381,11 @@ public class ServerThread {
                 String username = inputStream.readUTF();
                 String password = inputStream.readUTF();
                 boolean logged = userMan.verifyPassword(username, password);
-                //loggedPatient = patientMan;
+                if(logged){
+                    User u = userMan.getUserByUsername(username);
+                    int userId = u.getIdUser();
+                    loggedPatient = patientMan.getPatientByUserId(userId);
+                }
 
                 outputStream.writeUTF("LOGIN_RESULT");
                 if (logged) {
