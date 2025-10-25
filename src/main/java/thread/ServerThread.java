@@ -380,6 +380,7 @@ public class ServerThread {
                 String username = inputStream.readUTF();
                 String password = inputStream.readUTF();
                 boolean logged = userMan.verifyPassword(username, password);
+                //loggedPatient = patientMan;
 
                 outputStream.writeUTF("LOGIN_RESULT");
                 if (logged) {
