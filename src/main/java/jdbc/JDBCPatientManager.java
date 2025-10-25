@@ -1,6 +1,6 @@
 package jdbc;
 
-import common.enums.Sex;
+import pojos.enums.Sex;
 import jdbcInterfaces.PatientManager;
 import pojos.Patient;
 
