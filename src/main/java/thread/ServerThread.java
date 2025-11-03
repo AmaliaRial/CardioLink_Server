@@ -165,7 +165,7 @@ public class ServerThread {
                     new Thread(new ServerPatientThread(socket,inputStream, outputStream, doctorMan, patientMan, conMan, userMan)).start();
                 } else if(clientType.equalsIgnoreCase("Doctor")){
                     System.out.println("Is a doctor");
-                    //new Thread(new ServerDoctorThread(socket,connection,inputStream)).start();
+                    new Thread(new ServerDoctorThread(socket,connection,inputStream)).start();
                 } else if(clientType.equalsIgnoreCase("Admin")){
                     System.out.println("Is an administrator");
                     new Thread(new ServerAdminThread(socket,inputStream,serverSocket)).start();
@@ -499,7 +499,243 @@ public class ServerThread {
         }
 
     }
+    // SERVER DOCTOR THREAD
+
+    private static class ServerDoctorThread implements Runnable {
+        private final Socket socket;
+        private final Connection connection;
+        private final DataInputStream inputStream;
+
+        private ServerDoctorThread(Socket socket, Connection connection, DataInputStream inputStream){
+            this.socket = socket;
+            this.connection = connection;
+            this.inputStream = inputStream;
+        }
+
+        @Override
+        public void run() {
+            DataOutputStream outputStream = null;
+            ConnectionManager conMan = new ConnectionManager();
+            JDBCPatientManager patientMan = new JDBCPatientManager(conMan);
+            JDBCDoctorManager doctorMan = new JDBCDoctorManager(conMan);
+            JDBCUserManager userMan = new JDBCUserManager(conMan);
+            Integer loggedDoctorUserId = null;
+
+            try {
+                outputStream = new DataOutputStream(socket.getOutputStream());
+
+                while (!socket.isClosed()) {
+                    String command;
+                    try {
+                        command = inputStream.readUTF();
+                    } catch (IOException e) {
+                        System.out.println("Doctor disconnected (readUTF failed).");
+                        break;
+                    }
+
+                    switch (command) {
+                        case "LOGIN":
+                            handleLogin(userMan, outputStream);
+                            // set loggedDoctorUserId if needed by reading user again
+                            try {
+                                // attempt to set logged id
+                                // read username from client again is inside handleLogin; if you need id stored, adapt handleLogin to return it
+                            } catch (Exception ignored) {}
+                            break;
+
+                        case "LIST_PATIENTS":
+                            handleListPatients(conMan, outputStream);
+                            break;
+
+                        case "GET_DIAGNOSIS":
+                            handleGetDiagnosis(conMan, outputStream);
+                            break;
+
+                        case "UPDATE_DIAGNOSIS":
+                            handleUpdateDiagnosis(conMan, outputStream);
+                            break;
+
+                        case "UPDATE_MEDICATION":
+                            handleUpdateMedication(conMan, outputStream);
+                            break;
+
+                        case "LOGOUT":
+                        case "EXIT":
+                            outputStream.writeUTF("ACK");
+                            outputStream.writeUTF("Goodbye");
+                            outputStream.flush();
+                            return;
+
+                        case "ERROR":
+                            String err = inputStream.readUTF();
+                            System.err.println("Client reported error: " + err);
+                            break;
+
+                        default:
+                            outputStream.writeUTF("ERROR");
+                            outputStream.writeUTF("Unknown command: " + command);
+                            outputStream.flush();
+                            break;
+                    }
+                }
+            } catch (IOException ex) {
+                Logger.getLogger(ServerThread.class.getName()).log(Level.SEVERE, "Doctor thread IO error", ex);
+            } finally {
+                System.out.println("Doctor disconnected");
+                releaseResourcesDoctor(inputStream, socket, outputStream);
+            }
+        }
+
+        private void handleLogin(JDBCUserManager userMan, DataOutputStream outputStream) throws IOException {
+            try {
+                String username = inputStream.readUTF();
+                String password = inputStream.readUTF();
+                boolean logged = userMan.verifyPassword(username, password);
+                outputStream.writeUTF("LOGIN_RESULT");
+                if (logged) {
+                    User u = userMan.getUserByUsername(username);
+                    outputStream.writeBoolean(true);
+                    outputStream.writeUTF("Login successful. Welcome doctor " + (username != null ? username : ""));
+                } else {
+                    outputStream.writeBoolean(false);
+                    outputStream.writeUTF("Invalid username or password.");
+                }
+                outputStream.flush();
+            } catch (Exception e) {
+                outputStream.writeUTF("LOGIN_RESULT");
+                outputStream.writeBoolean(false);
+                outputStream.writeUTF("Login error: " + e.getMessage());
+                outputStream.flush();
+            }
+        }
+
+        private void handleListPatients(ConnectionManager conMan, DataOutputStream outputStream) throws IOException {
+            try (var c = conMan.getConnection();
+                 var ps = c.prepareStatement("SELECT idPatient, namePatient, surnamePatient, dniPatient FROM patient");
+                 var rs = ps.executeQuery()) {
+
+                ArrayList<Integer> ids = new ArrayList<>();
+                ArrayList<String> names = new ArrayList<>();
+                ArrayList<String> surnames = new ArrayList<>();
+                ArrayList<String> dnis = new ArrayList<>();
+                while (rs.next()) {
+                    ids.add(rs.getInt("idPatient"));
+                    names.add(rs.getString("namePatient"));
+                    surnames.add(rs.getString("surnamePatient"));
+                    dnis.add(rs.getString("dniPatient"));
+                }
+                outputStream.writeUTF("PATIENT_LIST");
+                outputStream.writeInt(ids.size());
+                for (int i = 0; i < ids.size(); i++) {
+                    outputStream.writeInt(ids.get(i));
+                    outputStream.writeUTF(names.get(i));
+                    outputStream.writeUTF(surnames.get(i));
+                    outputStream.writeUTF(dnis.get(i) == null ? "" : dnis.get(i));
+                }
+                outputStream.flush();
+            } catch (SQLException ex) {
+                Logger.getLogger(ServerThread.class.getName()).log(Level.SEVERE, "Error listing patients", ex);
+                outputStream.writeUTF("ERROR");
+                outputStream.writeUTF("Failed to list patients: " + ex.getMessage());
+                outputStream.flush();
+            }
+        }
+
+        private void handleGetDiagnosis(ConnectionManager conMan, DataOutputStream outputStream) throws IOException {
+            int patientId = inputStream.readInt();
+            try (var c = conMan.getConnection();
+                 var ps = c.prepareStatement(
+                         "SELECT id, date, diagnosis, medication, sensorDataECG, sensorDataEDA, symptoms FROM diagnosisFile WHERE patientId = ?")) {
+                ps.setInt(1, patientId);
+                try (var rs = ps.executeQuery()) {
+                    ArrayList<Integer> ids = new ArrayList<>();
+                    ArrayList<String> dates = new ArrayList<>();
+                    ArrayList<String> diagnoses = new ArrayList<>();
+                    ArrayList<String> medications = new ArrayList<>();
+                    ArrayList<String> ecgs = new ArrayList<>();
+                    ArrayList<String> edas = new ArrayList<>();
+                    ArrayList<String> symptoms = new ArrayList<>();
+                    while (rs.next()) {
+                        ids.add(rs.getInt("id"));
+                        dates.add(rs.getDate("date") != null ? rs.getDate("date").toString() : "");
+                        diagnoses.add(rs.getString("diagnosis"));
+                        medications.add(rs.getString("medication"));
+                        ecgs.add(rs.getString("sensorDataECG"));
+                        edas.add(rs.getString("sensorDataEDA"));
+                        symptoms.add(rs.getString("symptoms"));
+                    }
+                    outputStream.writeUTF("DIAGNOSIS_LIST");
+                    outputStream.writeInt(ids.size());
+                    for (int i = 0; i < ids.size(); i++) {
+                        outputStream.writeInt(ids.get(i));
+                        outputStream.writeUTF(dates.get(i));
+                        outputStream.writeUTF(diagnoses.get(i) == null ? "" : diagnoses.get(i));
+                        outputStream.writeUTF(medications.get(i) == null ? "" : medications.get(i));
+                        outputStream.writeUTF(ecgs.get(i) == null ? "" : ecgs.get(i));
+                        outputStream.writeUTF(edas.get(i) == null ? "" : edas.get(i));
+                        outputStream.writeUTF(symptoms.get(i) == null ? "" : symptoms.get(i));
+                    }
+                    outputStream.flush();
+                }
+            } catch (SQLException ex) {
+                Logger.getLogger(ServerThread.class.getName()).log(Level.SEVERE, "Error retrieving diagnosis", ex);
+                outputStream.writeUTF("ERROR");
+                outputStream.writeUTF("Failed to get diagnosis: " + ex.getMessage());
+                outputStream.flush();
+            }
+        }
+
+        private void handleUpdateDiagnosis(ConnectionManager conMan, DataOutputStream outputStream) throws IOException {
+            int diagnosisId = inputStream.readInt();
+            String newDiagnosis = inputStream.readUTF();
+            try (var c = conMan.getConnection();
+                 var ps = c.prepareStatement("UPDATE diagnosisFile SET diagnosis = ? WHERE id = ?")) {
+                ps.setString(1, newDiagnosis);
+                ps.setInt(2, diagnosisId);
+                int updated = ps.executeUpdate();
+                if (updated > 0) {
+                    outputStream.writeUTF("ACK");
+                    outputStream.writeUTF("Diagnosis updated");
+                } else {
+                    outputStream.writeUTF("ERROR");
+                    outputStream.writeUTF("Diagnosis not found");
+                }
+                outputStream.flush();
+            } catch (SQLException ex) {
+                Logger.getLogger(ServerThread.class.getName()).log(Level.SEVERE, "Error updating diagnosis", ex);
+                outputStream.writeUTF("ERROR");
+                outputStream.writeUTF("Failed to update diagnosis: " + ex.getMessage());
+                outputStream.flush();
+            }
+        }
+
+        private void handleUpdateMedication(ConnectionManager conMan, DataOutputStream outputStream) throws IOException {
+            int diagnosisId = inputStream.readInt();
+            String newMedication = inputStream.readUTF();
+            try (var c = conMan.getConnection();
+                 var ps = c.prepareStatement("UPDATE diagnosisFile SET medication = ? WHERE id = ?")) {
+                ps.setString(1, newMedication);
+                ps.setInt(2, diagnosisId);
+                int updated = ps.executeUpdate();
+                if (updated > 0) {
+                    outputStream.writeUTF("ACK");
+                    outputStream.writeUTF("Medication updated");
+                } else {
+                    outputStream.writeUTF("ERROR");
+                    outputStream.writeUTF("Diagnosis not found");
+                }
+                outputStream.flush();
+            } catch (SQLException ex) {
+                Logger.getLogger(ServerThread.class.getName()).log(Level.SEVERE, "Error updating medication", ex);
+                outputStream.writeUTF("ERROR");
+                outputStream.writeUTF("Failed to update medication: " + ex.getMessage());
+                outputStream.flush();
+            }
+        }
+    }
+
 
 
 
 }
+
