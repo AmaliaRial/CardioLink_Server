@@ -27,16 +27,22 @@ public class ServerThread {
     private static final String PUBLIC_KEY = "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA2CFFsdTRyHeLWEKkKMV+JaiNzSlmxKUaYM37JBAq8fn6k6McbnsfftWQd4f6HvkwJBsDoVSszn54k64lJEZng7FX2u2+INqW2xOF4OxwcCKqv09n+BGqdx2thxQ6iaEEa/kPeDcsbCyaIF9BA/n+nGpWqacqpHUAtRXPA1cw9hpiY2Pfqhc5hkdJfnV6LlvhM5th/zxhfKT4KnJVynNzLj3zhLXWvRIfFCXZ7/zRkDhQ7hwRnjRY8h+1Fy08eIbSrv07t32vJH6cby2u/vFyvirB21KCZv7KMjkKaPbiZomBwVPkIr9ZgFGvCI2lbukmmZbw0MSKv6L3TjCb0pKUCwIDAQAB";
     private static final String PRIVATE_KEY = "MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDYIUWx1NHId4tYQqQoxX4lqI3NKWbEpRpgzfskECrx+fqToxxuex9+1ZB3h/oe+TAkGwOhVKzOfniTriUkRmeDsVfa7b4g2pbbE4Xg7HBwIqq/T2f4Eap3Ha2HFDqJoQRr+Q94NyxsLJogX0ED+f6calappyqkdQC1Fc8DVzD2GmJjY9+qFzmGR0l+dXouW+Ezm2H/PGF8pPgqclXKc3MuPfOEtda9Eh8UJdnv/NGQOFDuHBGeNFjyH7UXLTx4htKu/Tu3fa8kfpxvLa7+8XK+KsHbUoJm/soyOQpo9uJmiYHBU+Qiv1mAUa8IjaVu6SaZlvDQxIq/ovdOMJvSkpQLAgMBAAECggEABi9oxv6rL1UHr4S8cuCnv1YmRhBWH06w9DrMlTOPYbx6SLkVaUgBbAGaoWd9q9Zy/T8hd6pKWzWua/fLichsa7ARHYUn2sgtEbSdytGZaAW7Sq5wEmdsWttkGuzKiwGilo9jIb9nRS7YyP8uuqyaqVpZ+12dJan7RFWNG/Shs1cjjk2WhzgIxXqN4UTKMZQD5DBcQmX/4r4Ddixl68KOxnN4gTXEHN0UhCwKPCdHvdnIiFzykHu72EtBCdGfc5RHXv/VD2cFZYlDJ5pVB5MWv3ukiQVAkG4NRZDzq4yadVZ0MbDEmRrzwqkX9/y9XSVXW+1Nii7DFiUlFfs6ibPtSQKBgQDyuzt9KEnOBFcHQN44uBc10opApMKoV9uVoZbwxv/rsLN9iouXAuUbrJqRPNMBhNpWpM/Tf39B9jgNMmfuEznJYFsTU+KuTZsOTjhlNDjQuquamrUoqGDQg5NeH+mhcrl4MYkYuRcC4SrldpcYfu5KhNBXZ1iz03dCbfpnbMn53wKBgQDj8cgNQr9AzkbBpDT9RhD3BhvoIaY6JebGtISbi1D39e6NwwCjQ5vLhDkWBl9zfgq1jhSCGV7mFCtSI0k0diK61uZlm0+7Mldc6LXnpZjEdal20fABL1KuICAfLoaBW8m2m6B6cXsfVvTtLydQI+NZoOt9OkfErBiOg0L0hwsDVQKBgGpwE9wECKkgWhFCLq/sebEOS7WhCgLL0+w/WXLnsF1ntK1+TUvA5zpFa9n4NAbcfOm1h7SUmfcQwu92hQBuyc42RHmrNSF9wlp5jl1Ckw9ka891u67CdwG4UKzbjZVQO2grQJToxOBsYGUSpZsGPfPLXZiWJt1kA03L8BveJos9AoGAVVsrm3OcJItZyZdQ1GrRXX8nIhS/p1ScB1p/sbNInaG1M9aKvZhKlbosmkfGpHvVTMkoetM/Sw7QbhCSkBeQx8BDRFcVUzb1qe/mdhj3jNG2pKzWn8r1vgh/ns2QRo51iXDbdh5aiZDJZKvcn9DgiKaOqDUTvNzo0Szr/J85C4UCgYEA3/lPBNpPfjzeOHaS2eoRS8W5TuPtrQ1rUHBpDD5ixWOYSNeSZqSS4gXZduvND/Dm6kLrGg/e6qBFr4G+CKxcrCibsBbTkkP9nak5DMQJ3EMAQEUucQcVQ/cQ/AXdW/PjQbtbm5/blMcPlo1mxfy3Ggd32rX7y+V0Bw8NgiUGtvA=";
     private static final String DataBase_Address = "jdbc:sqlite:CardioLink.db";
-    private static final ConnectionManager conman = new ConnectionManager();
     private static final int port = 9000;
 
 
     public static void main(String[] args) throws IOException, SQLException {
-        JDBCUserManager userMan = new JDBCUserManager(conman);
-
-        try (Connection connection = DriverManager.getConnection(DataBase_Address)){
+        // Conexión y gestores se crean aquí para evitar doble creación de schema
+        try (Connection connection = DriverManager.getConnection(DataBase_Address)) {
             System.out.println("Connection to database established.");
-            conman.ensureSchema(connection);
+
+            // Crear ConnectionManager una sola vez (su constructor maneja schema)
+            ConnectionManager conman = new ConnectionManager();
+
+            // Crear user manager con el connection manager ya creado
+            JDBCUserManager userMan = new JDBCUserManager(conman);
+
+            // NOTA: no llamar conman.ensureSchema(connection) aquí si el constructor ya lo hace,
+            // así evitamos intentar crear columnas/tabla duplicadas.
 
             ServerSocket serverSocket = new ServerSocket(port);
             try {
@@ -45,10 +51,10 @@ public class ServerThread {
                     System.out.println("Server running on port " + port);
                     new Thread(new ServerClientThread(socket, connection, serverSocket)).start();
                 }
-            }finally {
+            } finally {
                 releaseResources(serverSocket);
             }
-        }catch (SQLException ex){
+        } catch (SQLException ex) {
             Logger.getLogger(ServerThread.class.getName()).log(Level.SEVERE, "Server error", ex);
         }
     }
@@ -165,7 +171,9 @@ public class ServerThread {
                     new Thread(new ServerPatientThread(socket,inputStream, outputStream, doctorMan, patientMan, conMan, userMan)).start();
                 } else if(clientType.equalsIgnoreCase("Doctor")){
                     System.out.println("Is a doctor");
-                    new Thread(new ServerDoctorThread(socket,connection,inputStream)).start();
+
+                    new Thread(new ServerDoctorThread(socket, inputStream, outputStream, doctorMan, patientMan, conMan, userMan)).start();
+
                 } else if(clientType.equalsIgnoreCase("Admin")){
                     System.out.println("Is an administrator");
                     new Thread(new ServerAdminThread(socket,inputStream,serverSocket)).start();
@@ -503,27 +511,38 @@ public class ServerThread {
 
     private static class ServerDoctorThread implements Runnable {
         private final Socket socket;
-        private final Connection connection;
         private final DataInputStream inputStream;
+        private final DataOutputStream outputStream;
+        private final ConnectionManager conMan;
+        private final JDBCPatientManager patientMan;
+        private final JDBCDoctorManager doctorMan;
+        private final JDBCUserManager userMan;
 
-        private ServerDoctorThread(Socket socket, Connection connection, DataInputStream inputStream){
+        // Estado de sesión del doctor (null si no autenticado)
+        private Integer loggedDoctorUserId = null;
+        private Integer loggedDoctorId = null;
+
+        // Firma unificada con ServerPatientThread
+        private ServerDoctorThread(Socket socket,
+                                   DataInputStream inputStream,
+                                   DataOutputStream outputStream,
+                                   JDBCDoctorManager doctorMan,
+                                   JDBCPatientManager patientMan,
+                                   ConnectionManager conMan,
+                                   JDBCUserManager userMan) {
             this.socket = socket;
-            this.connection = connection;
             this.inputStream = inputStream;
+            this.outputStream = outputStream;
+            this.conMan = conMan;
+            // Inicializar managers a partir de la misma conexión (coherente con ServerPatientThread)
+            this.patientMan = new JDBCPatientManager(conMan);
+            this.doctorMan = new JDBCDoctorManager(conMan);
+            this.userMan = new JDBCUserManager(conMan);
         }
 
         @Override
         public void run() {
-            DataOutputStream outputStream = null;
-            ConnectionManager conMan = new ConnectionManager();
-            JDBCPatientManager patientMan = new JDBCPatientManager(conMan);
-            JDBCDoctorManager doctorMan = new JDBCDoctorManager(conMan);
-            JDBCUserManager userMan = new JDBCUserManager(conMan);
-            Integer loggedDoctorUserId = null;
-
             try {
-                outputStream = new DataOutputStream(socket.getOutputStream());
-
                 while (!socket.isClosed()) {
                     String command;
                     try {
@@ -534,33 +553,34 @@ public class ServerThread {
                     }
 
                     switch (command) {
+                        case "SIGNUP":
+                            handleSignup();
+                            break;
+
                         case "LOGIN":
-                            handleLogin(userMan, outputStream);
-                            // set loggedDoctorUserId if needed by reading user again
-                            try {
-                                // attempt to set logged id
-                                // read username from client again is inside handleLogin; if you need id stored, adapt handleLogin to return it
-                            } catch (Exception ignored) {}
+                            handleLogin();
                             break;
 
                         case "LIST_PATIENTS":
-                            handleListPatients(conMan, outputStream);
+                            handleListPatients();
                             break;
 
                         case "GET_DIAGNOSIS":
-                            handleGetDiagnosis(conMan, outputStream);
+                            handleGetDiagnosis();
                             break;
 
                         case "UPDATE_DIAGNOSIS":
-                            handleUpdateDiagnosis(conMan, outputStream);
+                            handleUpdateDiagnosis();
                             break;
 
                         case "UPDATE_MEDICATION":
-                            handleUpdateMedication(conMan, outputStream);
+                            handleUpdateMedication();
                             break;
 
                         case "LOGOUT":
                         case "EXIT":
+                            loggedDoctorUserId = null;
+                            loggedDoctorId = null;
                             outputStream.writeUTF("ACK");
                             outputStream.writeUTF("Goodbye");
                             outputStream.flush();
@@ -586,19 +606,127 @@ public class ServerThread {
             }
         }
 
-        private void handleLogin(JDBCUserManager userMan, DataOutputStream outputStream) throws IOException {
+        private void handleSignup() throws IOException {
+            try {
+                // Leer payload en el mismo orden que el cliente debe enviar
+                String username = inputStream.readUTF();
+                String password = inputStream.readUTF();
+                String name = inputStream.readUTF();
+                String surname = inputStream.readUTF();
+                String birthday = inputStream.readUTF(); // "yyyy-MM-dd"
+                String sex = inputStream.readUTF();
+                String email = inputStream.readUTF();
+                String specialty = inputStream.readUTF();
+                String licenseNumber = inputStream.readUTF();
+                String dni = inputStream.readUTF();
+
+                // Validaciones básicas
+                if (!dni.matches("\\d{8}[A-Z]")) {
+                    outputStream.writeUTF("ERROR");
+                    outputStream.writeUTF("Invalid DNI format.");
+                    outputStream.flush();
+                    return;
+                }
+                if (!email.matches("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+$")) {
+                    outputStream.writeUTF("ERROR");
+                    outputStream.writeUTF("Invalid email format.");
+                    outputStream.flush();
+                    return;
+                }
+
+                String encryptedPass = Encryption.encrypt(password, PUBLIC_KEY);
+
+                // Registrar usuario con role DOCTOR
+                try {
+                    userMan.register(username, encryptedPass, "DOCTOR");
+                } catch (Exception e) {
+                    outputStream.writeUTF("ERROR");
+                    outputStream.writeUTF("User registration failed: " + e.getMessage());
+                    outputStream.flush();
+                    return;
+                }
+
+                User u = userMan.getUserByUsername(username);
+                if (u == null) {
+                    outputStream.writeUTF("ERROR");
+                    outputStream.writeUTF("User registration failed (no user returned).");
+                    outputStream.flush();
+                    return;
+                }
+
+                // Insertar fila en doctors vinculada al userId
+                try (Connection c = conMan.getConnection();
+                     java.sql.PreparedStatement ps = c.prepareStatement(
+                             "INSERT INTO doctors (userId, nameDoctor, surnameDoctor, dniDoctor, dobDoctor, emailDoctor, sexDoctor, specialty, licenseNumber) VALUES (?,?,?,?,?,?,?,?,?)")) {
+                    ps.setInt(1, u.getIdUser());
+                    ps.setString(2, name);
+                    ps.setString(3, surname);
+                    ps.setString(4, dni);
+                    ps.setString(5, birthday);
+                    ps.setString(6, email);
+                    ps.setString(7, sex);
+                    ps.setString(8, specialty);
+                    ps.setString(9, licenseNumber);
+                    ps.executeUpdate();
+                } catch (SQLException ex) {
+                    Logger.getLogger(ServerThread.class.getName()).log(Level.SEVERE, "DB error inserting doctor", ex);
+                    outputStream.writeUTF("ERROR");
+                    outputStream.writeUTF("Failed to create doctor record: " + ex.getMessage());
+                    outputStream.flush();
+                    return;
+                }
+
+                outputStream.writeUTF("ACK");
+                outputStream.writeUTF("Doctor sign up successful. You can log in now.");
+                outputStream.flush();
+            } catch (Exception ex) {
+                outputStream.writeUTF("ERROR");
+                outputStream.writeUTF("Sign up failed: " + ex.getMessage());
+                outputStream.flush();
+            }
+        }
+
+        private void handleLogin() throws IOException {
             try {
                 String username = inputStream.readUTF();
                 String password = inputStream.readUTF();
                 boolean logged = userMan.verifyPassword(username, password);
+
                 outputStream.writeUTF("LOGIN_RESULT");
-                if (logged) {
-                    User u = userMan.getUserByUsername(username);
-                    outputStream.writeBoolean(true);
-                    outputStream.writeUTF("Login successful. Welcome doctor " + (username != null ? username : ""));
-                } else {
+
+                if (!logged) {
                     outputStream.writeBoolean(false);
                     outputStream.writeUTF("Invalid username or password.");
+                    outputStream.flush();
+                    return;
+                }
+
+                User u = userMan.getUserByUsername(username);
+                if (u == null || u.getRole() == null || !u.getRole().equalsIgnoreCase("DOCTOR")) {
+                    outputStream.writeBoolean(false);
+                    outputStream.writeUTF("User is not a doctor.");
+                    outputStream.flush();
+                    return;
+                }
+
+                try (var c = conMan.getConnection();
+                     var ps = c.prepareStatement("SELECT idDoctor FROM doctors WHERE userId = ?")) {
+                    ps.setInt(1, u.getIdUser());
+                    try (var rs = ps.executeQuery()) {
+                        if (rs.next()) {
+                            loggedDoctorUserId = u.getIdUser();
+                            loggedDoctorId = rs.getInt("idDoctor");
+                            outputStream.writeBoolean(true);
+                            outputStream.writeUTF("Login successful. Welcome doctor " + username);
+                        } else {
+                            outputStream.writeBoolean(false);
+                            outputStream.writeUTF("Doctor record not found in doctors table.");
+                        }
+                    }
+                } catch (SQLException ex) {
+                    Logger.getLogger(ServerThread.class.getName()).log(Level.SEVERE, "DB error during doctor login", ex);
+                    outputStream.writeBoolean(false);
+                    outputStream.writeUTF("Login error: " + ex.getMessage());
                 }
                 outputStream.flush();
             } catch (Exception e) {
@@ -609,9 +737,16 @@ public class ServerThread {
             }
         }
 
-        private void handleListPatients(ConnectionManager conMan, DataOutputStream outputStream) throws IOException {
+        private void handleListPatients() throws IOException {
+            if (loggedDoctorUserId == null) {
+                outputStream.writeUTF("ERROR");
+                outputStream.writeUTF("Not authenticated as doctor.");
+                outputStream.flush();
+                return;
+            }
+
             try (var c = conMan.getConnection();
-                 var ps = c.prepareStatement("SELECT idPatient, namePatient, surnamePatient, dniPatient FROM patient");
+                 var ps = c.prepareStatement("SELECT idPatient, namePatient, surnamePatient, dniPatient FROM patients");
                  var rs = ps.executeQuery()) {
 
                 ArrayList<Integer> ids = new ArrayList<>();
@@ -628,8 +763,8 @@ public class ServerThread {
                 outputStream.writeInt(ids.size());
                 for (int i = 0; i < ids.size(); i++) {
                     outputStream.writeInt(ids.get(i));
-                    outputStream.writeUTF(names.get(i));
-                    outputStream.writeUTF(surnames.get(i));
+                    outputStream.writeUTF(names.get(i) == null ? "" : names.get(i));
+                    outputStream.writeUTF(surnames.get(i) == null ? "" : surnames.get(i));
                     outputStream.writeUTF(dnis.get(i) == null ? "" : dnis.get(i));
                 }
                 outputStream.flush();
@@ -641,7 +776,14 @@ public class ServerThread {
             }
         }
 
-        private void handleGetDiagnosis(ConnectionManager conMan, DataOutputStream outputStream) throws IOException {
+        private void handleGetDiagnosis() throws IOException {
+            if (loggedDoctorUserId == null) {
+                outputStream.writeUTF("ERROR");
+                outputStream.writeUTF("Not authenticated as doctor.");
+                outputStream.flush();
+                return;
+            }
+
             int patientId = inputStream.readInt();
             try (var c = conMan.getConnection();
                  var ps = c.prepareStatement(
@@ -668,7 +810,7 @@ public class ServerThread {
                     outputStream.writeInt(ids.size());
                     for (int i = 0; i < ids.size(); i++) {
                         outputStream.writeInt(ids.get(i));
-                        outputStream.writeUTF(dates.get(i));
+                        outputStream.writeUTF(dates.get(i) == null ? "" : dates.get(i));
                         outputStream.writeUTF(diagnoses.get(i) == null ? "" : diagnoses.get(i));
                         outputStream.writeUTF(medications.get(i) == null ? "" : medications.get(i));
                         outputStream.writeUTF(ecgs.get(i) == null ? "" : ecgs.get(i));
@@ -685,7 +827,14 @@ public class ServerThread {
             }
         }
 
-        private void handleUpdateDiagnosis(ConnectionManager conMan, DataOutputStream outputStream) throws IOException {
+        private void handleUpdateDiagnosis() throws IOException {
+            if (loggedDoctorUserId == null) {
+                outputStream.writeUTF("ERROR");
+                outputStream.writeUTF("Not authenticated as doctor.");
+                outputStream.flush();
+                return;
+            }
+
             int diagnosisId = inputStream.readInt();
             String newDiagnosis = inputStream.readUTF();
             try (var c = conMan.getConnection();
@@ -709,7 +858,14 @@ public class ServerThread {
             }
         }
 
-        private void handleUpdateMedication(ConnectionManager conMan, DataOutputStream outputStream) throws IOException {
+        private void handleUpdateMedication() throws IOException {
+            if (loggedDoctorUserId == null) {
+                outputStream.writeUTF("ERROR");
+                outputStream.writeUTF("Not authenticated as doctor.");
+                outputStream.flush();
+                return;
+            }
+
             int diagnosisId = inputStream.readInt();
             String newMedication = inputStream.readUTF();
             try (var c = conMan.getConnection();
@@ -735,7 +891,4 @@ public class ServerThread {
     }
 
 
-
-
 }
-

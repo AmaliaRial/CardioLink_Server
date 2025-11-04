@@ -25,7 +25,11 @@ public class JDBCDoctorManager implements DoctorManager {
 
     public JDBCDoctorManager(ConnectionManager conMan) {
         this.conMan = conMan;
-        this.c = conMan.getConnection();
+        try {
+            this.c = conMan.getConnection();
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @Override

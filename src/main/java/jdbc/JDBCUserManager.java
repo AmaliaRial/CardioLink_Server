@@ -4,6 +4,7 @@ import jdbcInterfaces.UserManager;
 import pojos.User;
 import thread.ServerThread;
 
+
 import java.security.MessageDigest;
 import java.sql.*;
 import java.util.ArrayList;
@@ -31,17 +32,87 @@ public class JDBCUserManager implements UserManager{
         }
     }
 
+
+    public boolean createUser(String username, String encryptedPassword, Role role) {
+        Connection conn = null;
+        try {
+            conn = conMan.getConnection();
+            conn.setAutoCommit(false);
+
+            String insertUserSql = "INSERT INTO users (username, password, role) VALUES (?, ?, ?)";
+            try (PreparedStatement ps = conn.prepareStatement(insertUserSql, Statement.RETURN_GENERATED_KEYS)) {
+                ps.setString(1, username);
+                ps.setString(2, encryptedPassword);
+                ps.setString(3, role.name());
+                ps.executeUpdate();
+
+                try (ResultSet keys = ps.getGeneratedKeys()) {
+                    if (!keys.next()) {
+                        conn.rollback();
+                        return false;
+                    }
+                    int idUser = keys.getInt(1);
+
+                    if (role == Role.PATIENT) {
+                        
+                        String insertPatient = "INSERT INTO patients (" +
+                                "namePatient, surnamePatient, dniPatient, dobPatient, emailPatient, " +
+                                "sexPatient, phoneNumberPatient, healthInsuranceNumberPatient, emergencyContactPatient, userId) " +
+                                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+
+                        try (PreparedStatement psp = conn.prepareStatement(insertPatient)) {
+                            psp.setString(1, "");
+                            psp.setString(2, ""); // surname mínimo
+                            psp.setString(3, "unknown-" + idUser); // dni único mínimo
+                            psp.setString(4, "1970-01-01"); // dob mínimo
+                            psp.setString(5, "unknown-" + idUser + "@example.com");
+                            psp.setString(6, "UNSPECIFIED"); // sex
+                            psp.setLong(7, idUser);
+                            psp.setLong(8, 1000000L + idUser);
+                            psp.setLong(9, 0L);
+                            psp.setInt(10, idUser);
+                            psp.executeUpdate();
+                        }
+                    } else if (role == Role.DOCTOR) {
+                        String insertDoctor = "INSERT INTO doctors (userId, specialty, licenseNumber) VALUES (?, ?, ?)";
+                        try (PreparedStatement psd = conn.prepareStatement(insertDoctor)) {
+                            psd.setInt(1, idUser);
+                            psd.setString(2, null);
+                            psd.setString(3, null);
+                            psd.executeUpdate();
+                        }
+                    }
+                }
+            }
+
+            conn.commit();
+            return true;
+        } catch (SQLException e) {
+            try {
+                if (conn != null) conn.rollback();
+            } catch (SQLException ex) {
+                // ignorar
+            }
+            System.out.println("Error creando usuario: " + e.getMessage());
+            return false;
+        } finally {
+            try {
+                if (conn != null) conn.setAutoCommit(true);
+            } catch (SQLException ignored) {}
+        }
+    }
+
     @Override
     public void register(String username, String encryptedPassword, String role) {
-        String sql = "INSERT INTO users (username, password, role) VALUES (?, ?, ?)";
-        try (PreparedStatement pstmt = conMan.getConnection().prepareStatement(sql)) {
-            pstmt.setString(1, username);
-            pstmt.setString(2, encryptedPassword);  // store RSA-encrypted password directly
-            pstmt.setString(3, role);
-            pstmt.executeUpdate();
-        } catch (SQLException e) {
-            System.out.println("Error in the database");
-            e.printStackTrace();
+        Role r;
+        try {
+            r = Role.valueOf(role.toUpperCase());
+        } catch (Exception ex) {
+            r = Role.PATIENT;
+        }
+        boolean ok = createUser(username, encryptedPassword, r);
+        if (!ok) {
+            System.out.println("Registro fallido para usuario: " + username);
         }
     }
 
@@ -95,7 +166,7 @@ public class JDBCUserManager implements UserManager{
         try (Connection c = conMan.getConnection();
              PreparedStatement ps = c.prepareStatement(sql)) {
             ps.setString(1, username);
-                        ResultSet rs = ps.executeQuery();
+            ResultSet rs = ps.executeQuery();
 
             if (rs.next()) {
                 User u = new User();
