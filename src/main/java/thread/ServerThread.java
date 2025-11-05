@@ -606,9 +606,11 @@ public class ServerThread {
             }
         }
 
+
+
+
         private void handleSignup() throws IOException {
             try {
-                // Leer payload en el mismo orden que el cliente debe enviar
                 String username = inputStream.readUTF();
                 String password = inputStream.readUTF();
                 String name = inputStream.readUTF();
@@ -620,7 +622,6 @@ public class ServerThread {
                 String licenseNumber = inputStream.readUTF();
                 String dni = inputStream.readUTF();
 
-                // Validaciones básicas
                 if (!dni.matches("\\d{8}[A-Z]")) {
                     outputStream.writeUTF("ERROR");
                     outputStream.writeUTF("Invalid DNI format.");
@@ -636,55 +637,87 @@ public class ServerThread {
 
                 String encryptedPass = Encryption.encrypt(password, PUBLIC_KEY);
 
-                // Registrar usuario con role DOCTOR
-                try {
-                    userMan.register(username, encryptedPass, "DOCTOR");
-                } catch (Exception e) {
-                    outputStream.writeUTF("ERROR");
-                    outputStream.writeUTF("User registration failed: " + e.getMessage());
-                    outputStream.flush();
-                    return;
-                }
+                try (var c = conMan.getConnection()) {
+                    c.setAutoCommit(false);
+                    try {
 
-                User u = userMan.getUserByUsername(username);
-                if (u == null) {
-                    outputStream.writeUTF("ERROR");
-                    outputStream.writeUTF("User registration failed (no user returned).");
-                    outputStream.flush();
-                    return;
-                }
+                        int newUserId;
+                        try (var psUser = c.prepareStatement(
+                                "INSERT INTO users (username, password, role) VALUES (?,?,?)",
+                                java.sql.Statement.RETURN_GENERATED_KEYS)) {
+                            psUser.setString(1, username);
+                            psUser.setString(2, encryptedPass);
+                            psUser.setString(3, "DOCTOR");
+                            psUser.executeUpdate();
+                            try (var keys = psUser.getGeneratedKeys()) {
+                                if (!keys.next()) {
+                                    throw new SQLException("No user id generated");
+                                }
+                                newUserId = keys.getInt(1);
+                            }
+                        }
 
-                // Insertar fila en doctors vinculada al userId
-                try (Connection c = conMan.getConnection();
-                     java.sql.PreparedStatement ps = c.prepareStatement(
-                             "INSERT INTO doctors (userId, nameDoctor, surnameDoctor, dniDoctor, dobDoctor, emailDoctor, sexDoctor, specialty, licenseNumber) VALUES (?,?,?,?,?,?,?,?,?)")) {
-                    ps.setInt(1, u.getIdUser());
-                    ps.setString(2, name);
-                    ps.setString(3, surname);
-                    ps.setString(4, dni);
-                    ps.setString(5, birthday);
-                    ps.setString(6, email);
-                    ps.setString(7, sex);
-                    ps.setString(8, specialty);
-                    ps.setString(9, licenseNumber);
-                    ps.executeUpdate();
-                } catch (SQLException ex) {
-                    Logger.getLogger(ServerThread.class.getName()).log(Level.SEVERE, "DB error inserting doctor", ex);
-                    outputStream.writeUTF("ERROR");
-                    outputStream.writeUTF("Failed to create doctor record: " + ex.getMessage());
-                    outputStream.flush();
-                    return;
-                }
+                        //
+                        try (var check = c.prepareStatement("SELECT idDoctor FROM doctors WHERE userId = ?")) {
+                            check.setInt(1, newUserId);
+                            try (var rs = check.executeQuery()) {
+                                if (rs.next()) {
+                                    c.rollback();
+                                    outputStream.writeUTF("ERROR");
+                                    outputStream.writeUTF("Doctor already registered for this user.");
+                                    outputStream.flush();
+                                    return;
+                                }
+                            }
+                        }
 
-                outputStream.writeUTF("ACK");
-                outputStream.writeUTF("Doctor sign up successful. You can log in now.");
-                outputStream.flush();
+                        //
+                        try (java.sql.PreparedStatement psDoc = c.prepareStatement(
+                                "INSERT INTO doctors (userId, nameDoctor, surnameDoctor, dniDoctor, dobDoctor, emailDoctor, sexDoctor, specialty, licenseNumber) VALUES (?,?,?,?,?,?,?,?,?)")) {
+                            psDoc.setInt(1, newUserId);          // userId obtenido al crear el user
+                            psDoc.setString(2, name);
+                            psDoc.setString(3, surname);
+                            psDoc.setString(4, dni);
+                            psDoc.setString(5, birthday);
+                            psDoc.setString(6, email);
+                            psDoc.setString(7, sex);
+                            psDoc.setString(8, specialty);
+                            psDoc.setString(9, licenseNumber);
+
+                            System.out.println("Insertando doctor: userId=" + newUserId + " dni=" + dni + " email=" + email);
+
+                            psDoc.executeUpdate();
+                        }
+
+                        c.commit();
+                        outputStream.writeUTF("ACK");
+                        outputStream.writeUTF("Doctor sign up successful. You can log in now.");
+                        outputStream.flush();
+                        return;
+                    } catch (SQLException ex) {
+                        try { c.rollback(); } catch (SQLException ignore) {}
+                        String msg = ex.getMessage() != null ? ex.getMessage() : ex.toString();
+                        if (msg.contains("UNIQUE") || msg.contains("constraint failed")) {
+                            outputStream.writeUTF("ERROR");
+                            outputStream.writeUTF("User or doctor already exists (unique constraint).");
+                        } else {
+                            outputStream.writeUTF("ERROR");
+                            outputStream.writeUTF("Sign up DB error: " + msg);
+                        }
+                        outputStream.flush();
+                        return;
+                    } finally {
+                        try { c.setAutoCommit(true); } catch (SQLException ignore) {}
+                    }
+                }
             } catch (Exception ex) {
                 outputStream.writeUTF("ERROR");
                 outputStream.writeUTF("Sign up failed: " + ex.getMessage());
                 outputStream.flush();
             }
         }
+
+
 
         private void handleLogin() throws IOException {
             try {
