@@ -3,7 +3,6 @@ package thread;
 import jdbc.*;
 import pojos.DiagnosisFile;
 import pojos.Patient;
-import pojos.Symptoms;
 import pojos.User;
 
 import java.io.DataInputStream;
@@ -234,7 +233,7 @@ public class ServerThread {
         // Buffers during recording
         private final List<Integer> ECG = new ArrayList<>();
         private final List<Integer> EDA = new ArrayList<>();
-        private ArrayList<Symptoms> currentSymptoms = new ArrayList<>();
+        private ArrayList<String> currentSymptoms = new ArrayList<>();
         private Patient loggedPatient = null;
 
         private ServerPatientThread(Socket socket, DataInputStream inputStream, DataOutputStream outputStream, JDBCDoctorManager doctorMan, JDBCPatientManager patientMan, ConnectionManager conMan, JDBCUserManager userMan) {
@@ -293,10 +292,11 @@ public class ServerThread {
                             ECG.clear();
                             EDA.clear();
                             break;
-
+                        /** NOT NEEDED TO HANDLE ANY MORE (symptoms is not a class)
                         case "SYMPTOMS":
                             handleSymptoms();
                             break;
+                         */
 
                         case "ERROR":
                             // Client informs of an error
@@ -462,7 +462,7 @@ public class ServerThread {
                 EDA.clear();
             }
         }
-
+        /**THIS IS NOT NEEDED SINCE ITS NOT A CLASS ANY MORE
         private void handleSymptoms() throws IOException {
             int count = inputStream.readInt();
             currentSymptoms = new ArrayList<>();
@@ -479,6 +479,7 @@ public class ServerThread {
             outputStream.writeUTF("Symptoms received.");
             outputStream.flush();
         }
+         */
 
         private void saveDiagnosisFile(DiagnosisFile file) throws SQLException {
             // Use JDBCDoctorManager to insert a new record
@@ -488,7 +489,7 @@ public class ServerThread {
 
                 String symptomsSerialized = file.getSymptoms() == null ? "" :
                         file.getSymptoms().stream()
-                                .map(Symptoms::getNameSymptom)
+                                //.map(Symptoms::getNameSymptom) NOT A CLASS GET NAME DIRECT FROM STRING
                                 .collect(Collectors.joining(", "));
 
                 ps.setString(1, symptomsSerialized);

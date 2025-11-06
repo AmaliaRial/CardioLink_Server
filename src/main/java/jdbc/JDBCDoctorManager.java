@@ -4,7 +4,6 @@ import jdbcInterfaces.DoctorManager;
 import pojos.enums.Sex;
 import pojos.DiagnosisFile;
 import pojos.Patient;
-import pojos.Symptoms;
 
 import java.io.FileWriter;
 import java.io.IOException;
@@ -12,7 +11,6 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -53,6 +51,7 @@ public class JDBCDoctorManager implements DoctorManager {
                 file.setStatus(rs.getBoolean("status"));
                 String symptomsStr = rs.getString("symptoms");
                 List<String> symptoms = Arrays.asList(symptomsStr.split(","));
+                file.setSymptoms((ArrayList<String>) symptoms);
                 recentFiles.add(file);
             }
 
@@ -83,6 +82,7 @@ public class JDBCDoctorManager implements DoctorManager {
                 file.setStatus(rs.getBoolean("status"));
                 String symptomsStr = rs.getString("symptoms");
                 List<String> symptoms = Arrays.asList(symptomsStr.split(","));
+                file.setSymptoms((ArrayList<String>) symptoms);
                 recentFiles.add(file);
             }
 
@@ -106,7 +106,7 @@ public class JDBCDoctorManager implements DoctorManager {
                     diagnosisFile.getStatus() + "\n\n");
 
             writer.write("Symptoms:\n");
-            for (Symptoms symptom : diagnosisFile.getSymptoms()) {
+            for (String symptom : diagnosisFile.getSymptoms()) {
                 writer.write("- " + symptom + "\n");
             }
             writer.write("\nSensor Data:\n");
@@ -144,6 +144,7 @@ public class JDBCDoctorManager implements DoctorManager {
                 file.setStatus(rs.getBoolean("status"));
                 String symptomsStr = rs.getString("symptoms");
                 List<String> symptoms = Arrays.asList(symptomsStr.split(","));
+                file.setSymptoms((ArrayList<String>) symptoms);
                 diagnosisFiles.add(file);
             }
         } catch (SQLException e) {
