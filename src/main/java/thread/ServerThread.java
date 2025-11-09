@@ -293,9 +293,9 @@ public class ServerThread {
                             EDA.clear();
                             break;
                         /** NOT NEEDED TO HANDLE ANY MORE (symptoms is not a class)
-                        case "SYMPTOMS":
-                            handleSymptoms();
-                            break;
+                         case "SYMPTOMS":
+                         handleSymptoms();
+                         break;
                          */
 
                         case "ERROR":
@@ -362,7 +362,16 @@ public class ServerThread {
             p.setSurnamePatient(surname);
             p.setEmailPatient(email);
             p.setDniPatient(dni);
-            p.setSexPatient(pojos.enums.Sex.valueOf(sex.toUpperCase()));
+
+            try {
+                p.setSexPatient(parseSex(sex));
+            } catch (IllegalArgumentException ex) {
+                outputStream.writeUTF("ERROR");
+                outputStream.writeUTF("Invalid sex value: " + ex.getMessage());
+                outputStream.flush();
+                return;
+            }
+
             p.setPhoneNumberPatient(Integer.parseInt(phone));
             p.setHealthInsuranceNumberPatient(Integer.parseInt(insurance));
             p.setDobPatient(new java.text.SimpleDateFormat("yyyy-MM-dd").parse(birthday));
@@ -380,6 +389,28 @@ public class ServerThread {
                 outputStream.writeUTF("ERROR");
                 outputStream.writeUTF("Sign up failed: " + ex.getMessage());
                 outputStream.flush();
+            }
+        }
+
+        private pojos.enums.Sex parseSex(String sexStr) {
+            if (sexStr == null) {
+                throw new IllegalArgumentException("Sex value is null");
+            }
+            String s = sexStr.trim().toUpperCase();
+
+            // Map common cases
+            if (s.equals("M") || s.equals("MALE") || s.equals("MAN") || s.equals("H") || s.equals("HOMBRE")) {
+                return pojos.enums.Sex.MALE;
+            }
+            if (s.equals("F") || s.equals("FEMALE") || s.equals("W") || s.equals("WOMAN") || s.equals("MUJER")) {
+                return pojos.enums.Sex.FEMALE;
+            }
+
+            // Try direct enum name (in case client already sends MALE/FEMALE or other valid names)
+            try {
+                return pojos.enums.Sex.valueOf(s);
+            } catch (IllegalArgumentException ex) {
+                throw new IllegalArgumentException("Valor de sexo no reconocido: " + sexStr);
             }
         }
 
@@ -463,22 +494,22 @@ public class ServerThread {
             }
         }
         /**THIS IS NOT NEEDED SINCE ITS NOT A CLASS ANY MORE
-        private void handleSymptoms() throws IOException {
-            int count = inputStream.readInt();
-            currentSymptoms = new ArrayList<>();
-            for (int i = 0; i < count; i++) {
-                int id = inputStream.readInt();
-                if (id > 0) {
-                    currentSymptoms.add(new Symptoms(id));
-                }
-            }
-            String timestamp = inputStream.readUTF();
-            System.out.printf("Received symptoms %s at %s%n", currentSymptoms, timestamp);
+         private void handleSymptoms() throws IOException {
+         int count = inputStream.readInt();
+         currentSymptoms = new ArrayList<>();
+         for (int i = 0; i < count; i++) {
+         int id = inputStream.readInt();
+         if (id > 0) {
+         currentSymptoms.add(new Symptoms(id));
+         }
+         }
+         String timestamp = inputStream.readUTF();
+         System.out.printf("Received symptoms %s at %s%n", currentSymptoms, timestamp);
 
-            outputStream.writeUTF("ACK");
-            outputStream.writeUTF("Symptoms received.");
-            outputStream.flush();
-        }
+         outputStream.writeUTF("ACK");
+         outputStream.writeUTF("Symptoms received.");
+         outputStream.flush();
+         }
          */
 
         private void saveDiagnosisFile(DiagnosisFile file) throws SQLException {
