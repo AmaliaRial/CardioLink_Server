@@ -64,7 +64,7 @@ public class ConnectionManager {
 
             st.execute("CREATE TABLE IF NOT EXISTS patients (" +
                     "idPatient INTEGER PRIMARY KEY AUTOINCREMENT," +
-                    "userId INTEGER UNIQUE," +               // referenced to users(idUser)
+                    "userId INTEGER UNIQUE," +
                     "namePatient TEXT," +
                     "surnamePatient TEXT," +
                     "dniPatient TEXT UNIQUE," +
@@ -79,7 +79,7 @@ public class ConnectionManager {
 
             st.execute("CREATE TABLE IF NOT EXISTS doctors (" +
                     "idDoctor INTEGER PRIMARY KEY AUTOINCREMENT," +
-                    "userId INTEGER UNIQUE," +               // referenced to users(idUser)
+                    "userId INTEGER UNIQUE," +
                     "nameDoctor TEXT," +
                     "surnameDoctor TEXT," +
                     "dniDoctor TEXT UNIQUE," +

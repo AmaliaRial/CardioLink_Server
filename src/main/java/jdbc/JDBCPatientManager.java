@@ -1,4 +1,4 @@
-package jdbc;
+ package jdbc;
 
 import pojos.enums.Sex;
 import jdbcInterfaces.PatientManager;
@@ -8,6 +8,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.text.SimpleDateFormat;
 
 public class JDBCPatientManager implements PatientManager {
@@ -22,27 +23,116 @@ public class JDBCPatientManager implements PatientManager {
     @Override
     public void addPatient(Patient p) throws SQLException {
         String sql = "INSERT INTO patients(" +
-                "namePatient, surnamePatient, dniPatient, dobPatient, emailPatient, " +
+                "userId, namePatient, surnamePatient, dniPatient, dobPatient, emailPatient, " +
                 "sexPatient, phoneNumberPatient, healthInsuranceNumberPatient, emergencyContactPatient) " +
-                "VALUES (?,?,?,?,?,?,?,?,?)";
+                "VALUES (?,?,?,?,?,?,?,?,?,?)";
         try (Connection c = conMan.getConnection();
              PreparedStatement ps = c.prepareStatement(sql)) {
 
-            ps.setString(1, p.getNamePatient());
-            ps.setString(2, p.getSurnamePatient());
-            ps.setString(3, p.getDniPatient());
-            // Guardar la fecha como String en formato dd/MM/yyyy
-            String dobString = p.getDobPatient() != null ? SDF.format(p.getDobPatient()) : null;
-            ps.setString(4, dobString);
-            ps.setString(5, p.getEmailPatient());
+            Integer uid = p.getUserId();
+            if (uid == null || uid <= 0) {
+                ps.setNull(1, java.sql.Types.INTEGER);
+            } else {
+                ps.setInt(1, uid);
+            }
+
+            ps.setString(2, p.getNamePatient());
+            ps.setString(3, p.getSurnamePatient());
+            ps.setString(4, p.getDniPatient());
+
+            if (p.getDobPatient() != null) {
+                ps.setDate(5, new java.sql.Date(p.getDobPatient().getTime()));
+            } else {
+                ps.setNull(5, java.sql.Types.DATE);
+            }
+
+            ps.setString(6, p.getEmailPatient());
 
             Sex sex = p.getSexPatient();
-            ps.setString(6, sex == null ? null : sex.name());
-            ps.setInt(7, p.getPhoneNumberPatient());
-            ps.setInt(8, p.getHealthInsuranceNumberPatient());
-            ps.setInt(9, p.getEmergencyContactPatient());
+            ps.setString(7, sex == null ? null : sex.name());
+
+            Integer phone = p.getPhoneNumberPatient();
+            if (phone == null || phone <= 0) ps.setNull(8, java.sql.Types.INTEGER);
+            else ps.setInt(8, phone);
+
+            Integer health = p.getHealthInsuranceNumberPatient();
+            if (health == null || health <= 0) ps.setNull(9, java.sql.Types.INTEGER);
+            else ps.setInt(9, health);
+
+            Integer emergency = p.getEmergencyContactPatient();
+            if (emergency == null || emergency <= 0) ps.setNull(10, java.sql.Types.INTEGER);
+            else ps.setInt(10, emergency);
 
             ps.executeUpdate();
+        }
+    }
+
+    public void registerPatient(String username, String password, Patient p) throws SQLException {
+        String userSql = "INSERT INTO users(username,password,role) VALUES(?,?, 'PATIENT')";
+        String patientSql = "INSERT INTO patients(" +
+                "userId, namePatient, surnamePatient, dniPatient, dobPatient, emailPatient, " +
+                "sexPatient, phoneNumberPatient, healthInsuranceNumberPatient, emergencyContactPatient) " +
+                "VALUES (?,?,?,?,?,?,?,?,?,?)";
+
+        try (Connection c = conMan.getConnection()) {
+            c.setAutoCommit(false);
+            try (PreparedStatement psUser = c.prepareStatement(userSql, Statement.RETURN_GENERATED_KEYS);
+                 PreparedStatement psPatient = c.prepareStatement(patientSql)) {
+
+                // Insert user
+                psUser.setString(1, username);
+                psUser.setString(2, password); // hashear en producción
+                psUser.executeUpdate();
+
+                try (ResultSet keys = psUser.getGeneratedKeys()) {
+                    if (!keys.next()) {
+                        c.rollback();
+                        throw new SQLException("No se obtuvo id generado para user");
+                    }
+                    int userId = keys.getInt(1);
+                    p.setUserId(userId);
+
+                    // Preparar insert patient (mismos índices que en addPatient)
+                    Integer uid = p.getUserId();
+                    if (uid == null || uid <= 0) psPatient.setNull(1, java.sql.Types.INTEGER);
+                    else psPatient.setInt(1, uid);
+
+                    psPatient.setString(2, p.getNamePatient());
+                    psPatient.setString(3, p.getSurnamePatient());
+                    psPatient.setString(4, p.getDniPatient());
+
+                    if (p.getDobPatient() != null) {
+                        psPatient.setDate(5, new java.sql.Date(p.getDobPatient().getTime()));
+                    } else {
+                        psPatient.setNull(5, java.sql.Types.DATE);
+                    }
+
+                    psPatient.setString(6, p.getEmailPatient());
+
+                    Sex sex = p.getSexPatient();
+                    psPatient.setString(7, sex == null ? null : sex.name());
+
+                    Integer phone = p.getPhoneNumberPatient();
+                    if (phone == null || phone <= 0) psPatient.setNull(8, java.sql.Types.INTEGER);
+                    else psPatient.setInt(8, phone);
+
+                    Integer health = p.getHealthInsuranceNumberPatient();
+                    if (health == null || health <= 0) psPatient.setNull(9, java.sql.Types.INTEGER);
+                    else psPatient.setInt(9, health);
+
+                    Integer emergency = p.getEmergencyContactPatient();
+                    if (emergency == null || emergency <= 0) psPatient.setNull(10, java.sql.Types.INTEGER);
+                    else psPatient.setInt(10, emergency);
+
+                    psPatient.executeUpdate();
+                    c.commit();
+                }
+            } catch (SQLException ex) {
+                c.rollback();
+                throw ex;
+            } finally {
+                c.setAutoCommit(true);
+            }
         }
     }
 
@@ -59,7 +149,6 @@ public class JDBCPatientManager implements PatientManager {
 
                 if (sexStr != null) {
                     try {
-                        // Normalize possible single-letter or full names
                         if (sexStr.equalsIgnoreCase("M")) sexEnum = Sex.MALE;
                         else if (sexStr.equalsIgnoreCase("F")) sexEnum = Sex.FEMALE;
                         else sexEnum = Sex.valueOf(sexStr.toUpperCase());
@@ -78,47 +167,10 @@ public class JDBCPatientManager implements PatientManager {
                         rs.getInt("phoneNumberPatient"),
                         rs.getInt("healthInsuranceNumberPatient"),
                         rs.getInt("emergencyContactPatient"),
-                        rs.getInt("userId"))
-;
+                        rs.getInt("userId"));
                 return p;
             }
             return null;
         }
     }
-
-
-    /*
-    USERNAME AND PASSWORDS ARE NO LONGER STORED IN PATIENTS TABLE
-
-    public Patient getPatientByUsernameAndPassword(String username, String password) throws Exception {
-        String sql = "SELECT * FROM patients WHERE usernamePatient = ? AND passwordPatient = ?";
-        try (PreparedStatement ps = conMan.getConnection().prepareStatement(sql)) {
-            ps.setString(1, username);
-            ps.setString(2, password);
-            ResultSet rs = ps.executeQuery();
-            if (rs.next()) {
-                Patient p = new Patient();
-                p.setUsernamePatient(rs.getString("usernamePatient"));
-                p.setNamePatient(rs.getString("namePatient"));
-                p.setSurnamePatient(rs.getString("surnamePatient"));
-                p.setDniPatient(rs.getString("dniPatient"));
-
-                String dobStr = rs.getString("dobPatient");
-                try {
-                    p.setDobPatient(dobStr != null ? SDF.parse(dobStr) : null);
-                } catch (ParseException e) {
-                    p.setDobPatient(null);
-                }
-                p.setEmailPatient(rs.getString("emailPatient"));
-                p.setPasswordPatient(rs.getString("passwordPatient"));
-                String sexStr = rs.getString("sexPatient");
-                p.setSexPatient(sexStr == null ? null : Sex.valueOf(sexStr));
-                p.setPhoneNumberPatient(rs.getInt("phoneNumberPatient"));
-                p.setHealthInsuranceNumberPatient(rs.getInt("healthInsuranceNumberPatient"));
-                p.setEmergencyContactPatient(rs.getInt("emergencyContactPatient"));
-                return p;
-            }
-            return null;
-        }
-    }*/
 }

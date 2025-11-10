@@ -1,20 +1,60 @@
-package jdbc;
+ package jdbc;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
-//Esta clase la he creado para administrar la base de datos, en este caso borrar doctores por idDoctor.
+
+// Clase para administración de la base de datos (borrado de pacientes, usuarios, etc.)
 public class DBAdmin {
 
     public static void main(String[] args) {
-        // Backup antes de ejecutar: cp CardioLink.db CardioLink.db.bak
+        // Hacer backup antes de ejecutar manualmente: cp CardioLink.db CardioLink.db.bak
         ConnectionManager cm = new ConnectionManager();
         try {
-            deleteDoctorsByIds(cm, 1, 2); // borrar idDoctor 1 y 2
+            // Conservar id = 1 y borrar el resto
+            deleteUsersExcept(cm, 1);
+            deletePatientsExcept(cm, 1);
         } catch (SQLException e) {
             e.printStackTrace();
         } finally {
             cm.close();
+        }
+    }
+
+    public static int deleteUsersExcept(ConnectionManager cm, int keepId) throws SQLException {
+        try (Connection c = cm.getConnection()) {
+            c.setAutoCommit(false);
+            try {
+                try (PreparedStatement ps = c.prepareStatement("DELETE FROM users WHERE idUser <> ?")) {
+                    ps.setInt(1, keepId);
+                    int deleted = ps.executeUpdate();
+
+                    // Ajustar sqlite_sequence para que el siguiente id sea keepId + 1
+                    int seqValue = keepId;
+                    String updateSeq = "UPDATE sqlite_sequence SET seq = ? WHERE name = 'users'";
+                    try (PreparedStatement psSeq = c.prepareStatement(updateSeq)) {
+                        psSeq.setInt(1, seqValue);
+                        int updated = psSeq.executeUpdate();
+                        if (updated == 0) {
+                            try (PreparedStatement psInsert = c.prepareStatement(
+                                    "INSERT OR REPLACE INTO sqlite_sequence(name, seq) VALUES('users', ?)")) {
+                                psInsert.setInt(1, seqValue);
+                                psInsert.executeUpdate();
+                            }
+                        }
+                    } catch (SQLException exSeq) {
+                        // Si no es SQLite o no existe sqlite_sequence, ignorar el ajuste de secuencia
+                        System.err.println("No se pudo actualizar sqlite_sequence para 'users': " + exSeq.getMessage());
+                    }
+
+                    c.commit();
+                    System.out.println("Usuarios borrados (excepto idUser " + keepId + "): " + deleted);
+                    return deleted;
+                }
+            } catch (SQLException e) {
+                c.rollback();
+                throw e;
+            }
         }
     }
 
@@ -37,6 +77,42 @@ public class DBAdmin {
                 c.commit();
                 System.out.println("Filas borradas: " + deleted);
                 return deleted;
+            } catch (SQLException e) {
+                c.rollback();
+                throw e;
+            }
+        }
+    }
+
+    // Borra todos los pacientes excepto el indicado por keepId y ajusta la secuencia para que el siguiente id sea keepId+1
+    public static int deletePatientsExcept(ConnectionManager cm, int keepId) throws SQLException {
+        try (Connection c = cm.getConnection()) {
+            c.setAutoCommit(false);
+            try {
+                try (PreparedStatement ps = c.prepareStatement("DELETE FROM patients WHERE idPatient <> ?")) {
+                    ps.setInt(1, keepId);
+                    int deleted = ps.executeUpdate();
+
+                    int seqValue = keepId;
+                    String updateSeq = "UPDATE sqlite_sequence SET seq = ? WHERE name = 'patients'";
+                    try (PreparedStatement psSeq = c.prepareStatement(updateSeq)) {
+                        psSeq.setInt(1, seqValue);
+                        int updated = psSeq.executeUpdate();
+                        if (updated == 0) {
+                            try (PreparedStatement psInsert = c.prepareStatement(
+                                    "INSERT OR REPLACE INTO sqlite_sequence(name, seq) VALUES('patients', ?)")) {
+                                psInsert.setInt(1, seqValue);
+                                psInsert.executeUpdate();
+                            }
+                        }
+                    } catch (SQLException exSeq) {
+                        System.err.println("No se pudo actualizar sqlite_sequence: " + exSeq.getMessage());
+                    }
+
+                    c.commit();
+                    System.out.println("Pacientes borrados (excepto id " + keepId + "): " + deleted);
+                    return deleted;
+                }
             } catch (SQLException e) {
                 c.rollback();
                 throw e;
