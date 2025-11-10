@@ -46,9 +46,18 @@ public class ServerThread {
             ServerSocket serverSocket = new ServerSocket(port);
             try {
                 while (true) {
-                    Socket socket = serverSocket.accept();
-                    System.out.println("Server running on port " + port);
-                    new Thread(new ServerClientThread(socket, connection, serverSocket)).start();
+                    try {
+                        Socket socket = serverSocket.accept();
+                        System.out.println("Server running on port " + port);
+                        new Thread(new ServerClientThread(socket, connection, serverSocket)).start();
+                    } catch (java.net.SocketException se) {
+                        if (serverSocket.isClosed()) {
+                            System.out.println("Server socket closed. Shutting down...");
+                            break; // exit the loop cleanly
+                        } else {
+                            throw se; // unexpected
+                        }
+                    }
                 }
             } finally {
                 releaseResources(serverSocket);
@@ -183,6 +192,7 @@ public class ServerThread {
         }
     }
 
+    // SERVER ADMIN THREAD
     private static class ServerAdminThread implements  Runnable{
         Socket socket;
         DataInputStream inputStream;
@@ -201,26 +211,47 @@ public class ServerThread {
                     option = inputStream.readUTF();
                     switch (option.toLowerCase()){
                         case "shut down":
-                            outputStream = new DataOutputStream(socket.getOutputStream());
+                            /*outputStream = new DataOutputStream(socket.getOutputStream());
                             outputStream.writeUTF("The server is closing...");
                             adminShutdown(inputStream,socket,serverSocket,outputStream);
-                            System.exit(0);
+                            //System.exit(0);*/
+
+                            outputStream = new DataOutputStream(socket.getOutputStream());
+                            // ask (or just expect) a password as the very next UTF
+                            // If you don’t want to show a prompt, keep this line if you like
+                            // outputStream.writeUTF("PASSWORD?");
+                            outputStream.flush();
+
+                            String password = inputStream.readUTF();   // <-- read password sent by client
+                            if (password.equals("cardiolink_admin_pass")) {  // <-- check password
+                                outputStream.writeUTF("The server is closing...");
+                                outputStream.flush();
+                                adminShutdown(inputStream, socket, serverSocket, outputStream);
+                                return; // do NOT System.exit(0)
+                            } else {
+                                outputStream.writeUTF("Invalid password.");
+                                outputStream.flush();
+                                // keep the admin session open for another command
+                                break;
+                            }
+
                         case "exit":
                             adminLogoff(inputStream,socket);
                             return;
                     }
                 }
-            }catch (IOException ex){
-                Logger.getLogger(ServerThread.class.getName()).log(Level.SEVERE, null, ex);
-            }finally{
+            } catch (java.io.EOFException eof) {
+                // admin app closed the socket — this is normal
                 System.out.println("Admin disconnected");
+            }catch (IOException ex){
+                Logger.getLogger(ServerThread.class.getName()).log(Level.SEVERE, "Admin I/O error", ex);
+            }finally{
                 adminLogoff(inputStream,socket);
             }
         }
     }
 
-    //TODO IMPLEMENT DOCTOR AND CLIENT TREADS WITH HERE INPUT STREAMS AND IN THEIR APP OUTPUT STREAMS
-
+    // SERVER PATIENT THREAD
     private static class ServerPatientThread implements Runnable {
         private final Socket socket;
         private final DataInputStream inputStream;
