@@ -14,6 +14,7 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -368,13 +369,16 @@ public class ServerThread {
             String insurance = inputStream.readUTF();
             String emergencyContact = inputStream.readUTF();
 
-            // Validate server-side as well (basic)
-            if (!dni.matches("\\d{8}[A-Z]")) {
+            // Sanitize y validar DNI (acepta minúscula y formatos con guiones/espacios)
+            String dniClean = dni == null ? "" : dni.replaceAll("[^0-9A-Za-z]", "").toUpperCase();
+            if (!dniClean.matches("\\d{8}[A-Z]")) {
                 outputStream.writeUTF("ERROR");
-                outputStream.writeUTF("Invalid DNI format.");
+                outputStream.writeUTF("Invalid DNI format. Expected 8 dígitos y una letra (ej: 12345678A).");
                 outputStream.flush();
                 return;
             }
+
+            // Validate server-side as well (basic)
             if (!email.matches("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+$")) {
                 outputStream.writeUTF("ERROR");
                 outputStream.writeUTF("Invalid email format.");
@@ -392,7 +396,7 @@ public class ServerThread {
             p.setNamePatient(name);
             p.setSurnamePatient(surname);
             p.setEmailPatient(email);
-            p.setDniPatient(dni);
+            p.setDniPatient(dniClean);
 
             try {
                 p.setSexPatient(parseSex(sex));
@@ -405,7 +409,18 @@ public class ServerThread {
 
             p.setPhoneNumberPatient(Integer.parseInt(phone));
             p.setHealthInsuranceNumberPatient(Integer.parseInt(insurance));
-            p.setDobPatient(new java.text.SimpleDateFormat("yyyy-MM-dd").parse(birthday));
+
+            // Parse fecha en formato dd-MM-yyyy
+            try {
+                java.util.Date parsedDob = new SimpleDateFormat("dd-MM-yyyy").parse(birthday);
+                p.setDobPatient(parsedDob);
+            } catch (ParseException pe) {
+                outputStream.writeUTF("ERROR");
+                outputStream.writeUTF("Invalid birthday format. Use dd-MM-yyyy (ej: 31-12-1990).");
+                outputStream.flush();
+                return;
+            }
+
             p.setEmergencyContactPatient(Integer.parseInt(emergencyContact));
 
 
@@ -678,22 +693,41 @@ public class ServerThread {
                 String password = inputStream.readUTF();
                 String name = inputStream.readUTF();
                 String surname = inputStream.readUTF();
-                String birthday = inputStream.readUTF(); // "yyyy-MM-dd"
+                String birthday = inputStream.readUTF(); // "dd-MM-yyyy"
                 String sex = inputStream.readUTF();
                 String email = inputStream.readUTF();
                 String specialty = inputStream.readUTF();
                 String licenseNumber = inputStream.readUTF();
                 String dni = inputStream.readUTF();
 
-                if (!dni.matches("\\d{8}[A-Z]")) {
+                // Sanitize y validar DNI
+                String dniClean = dni == null ? "" : dni.replaceAll("[^0-9A-Za-z]", "").toUpperCase();
+                if (!dniClean.matches("\\d{8}[A-Z]") && !dniClean.matches("[XYZ]\\d{7}[A-Z]")) {
                     outputStream.writeUTF("ERROR");
-                    outputStream.writeUTF("Invalid DNI format.");
+                    outputStream.writeUTF(
+                            "Invalid DNI/NIE format. Expected 8 dígitos + letra (12345678A) " +
+                                    "o NIE tipo X1234567L."
+                    );
                     outputStream.flush();
                     return;
                 }
+
+
                 if (!email.matches("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+$")) {
                     outputStream.writeUTF("ERROR");
                     outputStream.writeUTF("Invalid email format.");
+                    outputStream.flush();
+                    return;
+                }
+
+                // Parsear DOB en formato dd-MM-yyyy y convertir a yyyy-MM-dd para la DB
+                String dobForDb;
+                try {
+                    java.util.Date parsed = new SimpleDateFormat("dd-MM-yyyy").parse(birthday);
+                    dobForDb = new SimpleDateFormat("yyyy-MM-dd").format(parsed);
+                } catch (ParseException pe) {
+                    outputStream.writeUTF("ERROR");
+                    outputStream.writeUTF("Invalid birthday format. Use dd-MM-yyyy (ej: 31-12-1990).");
                     outputStream.flush();
                     return;
                 }
@@ -740,14 +774,14 @@ public class ServerThread {
                             psDoc.setInt(1, newUserId);          // userId obtenido al crear el user
                             psDoc.setString(2, name);
                             psDoc.setString(3, surname);
-                            psDoc.setString(4, dni);
-                            psDoc.setString(5, birthday);
+                            psDoc.setString(4, dniClean);
+                            psDoc.setString(5, dobForDb); // usamos yyyy-MM-dd en la BDD
                             psDoc.setString(6, email);
                             psDoc.setString(7, sex);
                             psDoc.setString(8, specialty);
                             psDoc.setString(9, licenseNumber);
 
-                            System.out.println("Insertando doctor: userId=" + newUserId + " dni=" + dni + " email=" + email);
+                            System.out.println("Insertando doctor: userId=" + newUserId + " dni=" + dniClean + " email=" + email);
 
                             psDoc.executeUpdate();
                         }
