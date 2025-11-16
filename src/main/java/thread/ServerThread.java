@@ -22,12 +22,14 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
+import org.springframework.security.crypto.bcrypt.BCrypt;
+
 public class ServerThread {
 
-    private static final String PUBLIC_KEY = "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA2CFFsdTRyHeLWEKkKMV+JaiNzSlmxKUaYM37JBAq8fn6k6McbnsfftWQd4f6HvkwJBsDoVSszn54k64lJEZng7FX2u2+INqW2xOF4OxwcCKqv09n+BGqdx2thxQ6iaEEa/kPeDcsbCyaIF9BA/n+nGpWqacqpHUAtRXPA1cw9hpiY2Pfqhc5hkdJfnV6LlvhM5th/zxhfKT4KnJVynNzLj3zhLXWvRIfFCXZ7/zRkDhQ7hwRnjRY8h+1Fy08eIbSrv07t32vJH6cby2u/vFyvirB21KCZv7KMjkKaPbiZomBwVPkIr9ZgFGvCI2lbukmmZbw0MSKv6L3TjCb0pKUCwIDAQAB";
-    private static final String PRIVATE_KEY = "MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDYIUWx1NHId4tYQqQoxX4lqI3NKWbEpRpgzfskECrx+fqToxxuex9+1ZB3h/oe+TAkGwOhVKzOfniTriUkRmeDsVfa7b4g2pbbE4Xg7HBwIqq/T2f4Eap3Ha2HFDqJoQRr+Q94NyxsLJogX0ED+f6calappyqkdQC1Fc8DVzD2GmJjY9+qFzmGR0l+dXouW+Ezm2H/PGF8pPgqclXKc3MuPfOEtda9Eh8UJdnv/NGQOFDuHBGeNFjyH7UXLTx4htKu/Tu3fa8kfpxvLa7+8XK+KsHbUoJm/soyOQpo9uJmiYHBU+Qiv1mAUa8IjaVu6SaZlvDQxIq/ovdOMJvSkpQLAgMBAAECggEABi9oxv6rL1UHr4S8cuCnv1YmRhBWH06w9DrMlTOPYbx6SLkVaUgBbAGaoWd9q9Zy/T8hd6pKWzWua/fLichsa7ARHYUn2sgtEbSdytGZaAW7Sq5wEmdsWttkGuzKiwGilo9jIb9nRS7YyP8uuqyaqVpZ+12dJan7RFWNG/Shs1cjjk2WhzgIxXqN4UTKMZQD5DBcQmX/4r4Ddixl68KOxnN4gTXEHN0UhCwKPCdHvdnIiFzykHu72EtBCdGfc5RHXv/VD2cFZYlDJ5pVB5MWv3ukiQVAkG4NRZDzq4yadVZ0MbDEmRrzwqkX9/y9XSVXW+1Nii7DFiUlFfs6ibPtSQKBgQDyuzt9KEnOBFcHQN44uBc10opApMKoV9uVoZbwxv/rsLN9iouXAuUbrJqRPNMBhNpWpM/Tf39B9jgNMmfuEznJYFsTU+KuTZsOTjhlNDjQuquamrUoqGDQg5NeH+mhcrl4MYkYuRcC4SrldpcYfu5KhNBXZ1iz03dCbfpnbMn53wKBgQDj8cgNQr9AzkbBpDT9RhD3BhvoIaY6JebGtISbi1D39e6NwwCjQ5vLhDkWBl9zfgq1jhSCGV7mFCtSI0k0diK61uZlm0+7Mldc6LXnpZjEdal20fABL1KuICAfLoaBW8m2m6B6cXsfVvTtLydQI+NZoOt9OkfErBiOg0L0hwsDVQKBgGpwE9wECKkgWhFCLq/sebEOS7WhCgLL0+w/WXLnsF1ntK1+TUvA5zpFa9n4NAbcfOm1h7SUmfcQwu92hQBuyc42RHmrNSF9wlp5jl1Ckw9ka891u67CdwG4UKzbjZVQO2grQJToxOBsYGUSpZsGPfPLXZiWJt1kA03L8BveJos9AoGAVVsrm3OcJItZyZdQ1GrRXX8nIhS/p1ScB1p/sbNInaG1M9aKvZhKlbosmkfGpHvVTMkoetM/Sw7QbhCSkBeQx8BDRFcVUzb1qe/mdhj3jNG2pKzWn8r1vgh/ns2QRo51iXDbdh5aiZDJZKvcn9DgiKaOqDUTvNzo0Szr/J85C4UCgYEA3/lPBNpPfjzeOHaS2eoRS8W5TuPtrQ1rUHBpDD5ixWOYSNeSZqSS4gXZduvND/Dm6kLrGg/e6qBFr4G+CKxcrCibsBbTkkP9nak5DMQJ3EMAQEUucQcVQ/cQ/AXdW/PjQbtbm5/blMcPlo1mxfy3Ggd32rX7y+V0Bw8NgiUGtvA=";
     private static final String DataBase_Address = "jdbc:sqlite:CardioLink.db";
     private static final int port = 9000;
+    private static int workload = 12;
+    private static String hash = "$2a$06$.rCVZVOThsIa96pEDOxvGuRRgzG64bnptJ0938xuqzv18d3ZpQhstC";
 
 
     public static void main(String[] args) throws IOException, SQLException {
@@ -424,7 +426,7 @@ public class ServerThread {
             p.setEmergencyContactPatient(Integer.parseInt(emergencyContact));
 
 
-            String encryptedPass = Encryption.encrypt(password, PUBLIC_KEY);
+            String encryptedPass = hashPassword(password);
             try {
                 patientMan.addPatient(p);
                 userMan.register(username, encryptedPass, "PATIENT");
@@ -465,7 +467,8 @@ public class ServerThread {
             try {
                 String username = inputStream.readUTF();
                 String password = inputStream.readUTF();
-                boolean logged = userMan.verifyPassword(username, password);
+                //boolean logged = userMan.verifyPassword(username, password);
+                boolean logged = checkPassword(password, hash);
                 if(logged){
                     User u = userMan.getUserByUsername(username);
                     int userId = u.getIdUser();
@@ -732,7 +735,7 @@ public class ServerThread {
                     return;
                 }
 
-                String encryptedPass = Encryption.encrypt(password, PUBLIC_KEY);
+                String encryptedPass = hashPassword(password);
 
                 try (var c = conMan.getConnection()) {
                     c.setAutoCommit(false);
@@ -820,7 +823,7 @@ public class ServerThread {
             try {
                 String username = inputStream.readUTF();
                 String password = inputStream.readUTF();
-                boolean logged = userMan.verifyPassword(username, password);
+                boolean logged = checkPassword(password, hash);
 
                 outputStream.writeUTF("LOGIN_RESULT");
 
@@ -1018,6 +1021,24 @@ public class ServerThread {
                 outputStream.flush();
             }
         }
+    }
+
+    public static String hashPassword(String password_plaintext) {
+        String salt = BCrypt.gensalt(workload);
+        String hashed_password = BCrypt.hashpw(password_plaintext, salt);
+
+        return(hashed_password);
+    }
+
+    public static boolean checkPassword(String password_plaintext, String stored_hash) {
+        boolean password_verified = false;
+
+        if(null == stored_hash || !stored_hash.startsWith("$2a$"))
+            throw new java.lang.IllegalArgumentException("Invalid hash provided for comparison");
+
+        password_verified = BCrypt.checkpw(password_plaintext, stored_hash);
+
+        return(password_verified);
     }
 
 
