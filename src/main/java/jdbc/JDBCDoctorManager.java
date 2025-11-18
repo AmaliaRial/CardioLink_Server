@@ -234,4 +234,14 @@ public class JDBCDoctorManager implements DoctorManager {
             e.printStackTrace();
         }
     }
+
+    @Override
+    public List<DiagnosisFile> listDiagnosisFilesTODO(int idDoctor){
+        return null;
+    }
+
+    @Override
+    public List<DiagnosisFile> getAllDiagnosisFilesFromPatient(int idPatient){
+        return null;
+    }
 }

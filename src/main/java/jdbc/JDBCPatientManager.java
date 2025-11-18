@@ -1,5 +1,6 @@
  package jdbc;
 
+import pojos.DiagnosisFile;
 import pojos.enums.Sex;
 import jdbcInterfaces.PatientManager;
 import pojos.Patient;
@@ -10,8 +11,9 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.text.SimpleDateFormat;
+import java.util.List;
 
-public class JDBCPatientManager implements PatientManager {
+ public class JDBCPatientManager implements PatientManager {
 
     private final ConnectionManager conMan;
     private static final SimpleDateFormat SDF = new SimpleDateFormat("dd/MM/yyyy");
@@ -173,4 +175,9 @@ public class JDBCPatientManager implements PatientManager {
             return null;
         }
     }
+
+     @Override
+     public List<DiagnosisFile> getAllDiagnosisFilesFromPatient(int idPatient){
+         return null;
+     }
 }

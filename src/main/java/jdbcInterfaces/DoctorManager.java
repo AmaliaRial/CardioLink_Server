@@ -15,5 +15,7 @@ public interface DoctorManager {
     List<DiagnosisFile> listRecentlyFinishedFiles();
     List<DiagnosisFile> listAllFinishedFiles() ;
     void downloadFileInComputer(DiagnosisFile diagnosisFile) throws IOException;
+    List<DiagnosisFile> listDiagnosisFilesTODO(int idDoctor);
+    List<DiagnosisFile>  getAllDiagnosisFilesFromPatient(int idPatient);
 }
 

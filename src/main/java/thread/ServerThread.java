@@ -5,24 +5,23 @@ import pojos.DiagnosisFile;
 import pojos.Patient;
 import pojos.User;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
+import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.SQLException;
+import java.net.SocketException;
+import java.sql.*;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 import org.springframework.security.crypto.bcrypt.BCrypt;
+import pojos.enums.Sex;
 
 public class ServerThread {
 
@@ -53,7 +52,7 @@ public class ServerThread {
                         Socket socket = serverSocket.accept();
                         System.out.println("Server running on port " + port);
                         new Thread(new ServerClientThread(socket, connection, serverSocket)).start();
-                    } catch (java.net.SocketException se) {
+                    } catch (SocketException se) {
                         if (serverSocket.isClosed()) {
                             System.out.println("Server socket closed. Shutting down...");
                             break; // exit the loop cleanly
@@ -243,7 +242,7 @@ public class ServerThread {
                             return;
                     }
                 }
-            } catch (java.io.EOFException eof) {
+            } catch (EOFException eof) {
                 // admin app closed the socket — this is normal
                 System.out.println("Admin disconnected");
             }catch (IOException ex){
@@ -353,7 +352,7 @@ public class ServerThread {
                 throw new RuntimeException(e);
             } finally {
                 System.out.println("Client disconnected");
-                releaseResourcesPatient(inputStream, socket,outputStream);
+                releaseResourcesPatient(inputStream, socket, outputStream);
             }
         }
 
@@ -414,7 +413,7 @@ public class ServerThread {
 
             // Parse fecha en formato dd-MM-yyyy
             try {
-                java.util.Date parsedDob = new SimpleDateFormat("dd-MM-yyyy").parse(birthday);
+                Date parsedDob = new SimpleDateFormat("dd-MM-yyyy").parse(birthday);
                 p.setDobPatient(parsedDob);
             } catch (ParseException pe) {
                 outputStream.writeUTF("ERROR");
@@ -440,7 +439,7 @@ public class ServerThread {
             }
         }
 
-        private pojos.enums.Sex parseSex(String sexStr) {
+        private Sex parseSex(String sexStr) {
             if (sexStr == null) {
                 throw new IllegalArgumentException("Sex value is null");
             }
@@ -448,15 +447,15 @@ public class ServerThread {
 
             // Map common cases
             if (s.equals("M") || s.equals("MALE") || s.equals("MAN") || s.equals("H") || s.equals("HOMBRE")) {
-                return pojos.enums.Sex.MALE;
+                return Sex.MALE;
             }
             if (s.equals("F") || s.equals("FEMALE") || s.equals("W") || s.equals("WOMAN") || s.equals("MUJER")) {
-                return pojos.enums.Sex.FEMALE;
+                return Sex.FEMALE;
             }
 
             // Try direct enum name (in case client already sends MALE/FEMALE or other valid names)
             try {
-                return pojos.enums.Sex.valueOf(s);
+                return Sex.valueOf(s);
             } catch (IllegalArgumentException ex) {
                 throw new IllegalArgumentException("Valor de sexo no reconocido: " + sexStr);
             }
@@ -469,7 +468,7 @@ public class ServerThread {
                 String password = inputStream.readUTF();
                 //boolean logged = userMan.verifyPassword(username, password);
                 boolean logged = checkPassword(password, hash);
-                if(logged){
+                if (logged) {
                     User u = userMan.getUserByUsername(username);
                     int userId = u.getIdUser();
                     loggedPatient = patientMan.getPatientByUserId(userId);
@@ -542,23 +541,25 @@ public class ServerThread {
                 EDA.clear();
             }
         }
-        /**THIS IS NOT NEEDED SINCE ITS NOT A CLASS ANY MORE
-         private void handleSymptoms() throws IOException {
-         int count = inputStream.readInt();
-         currentSymptoms = new ArrayList<>();
-         for (int i = 0; i < count; i++) {
-         int id = inputStream.readInt();
-         if (id > 0) {
-         currentSymptoms.add(new Symptoms(id));
-         }
-         }
-         String timestamp = inputStream.readUTF();
-         System.out.printf("Received symptoms %s at %s%n", currentSymptoms, timestamp);
 
-         outputStream.writeUTF("ACK");
-         outputStream.writeUTF("Symptoms received.");
-         outputStream.flush();
-         }
+        /**
+         * THIS IS NOT NEEDED SINCE ITS NOT A CLASS ANY MORE
+         * private void handleSymptoms() throws IOException {
+         * int count = inputStream.readInt();
+         * currentSymptoms = new ArrayList<>();
+         * for (int i = 0; i < count; i++) {
+         * int id = inputStream.readInt();
+         * if (id > 0) {
+         * currentSymptoms.add(new Symptoms(id));
+         * }
+         * }
+         * String timestamp = inputStream.readUTF();
+         * System.out.printf("Received symptoms %s at %s%n", currentSymptoms, timestamp);
+         * <p>
+         * outputStream.writeUTF("ACK");
+         * outputStream.writeUTF("Symptoms received.");
+         * outputStream.flush();
+         * }
          */
 
         private void saveDiagnosisFile(DiagnosisFile file) throws SQLException {
@@ -583,13 +584,61 @@ public class ServerThread {
             }
         }
 
+        public void sendAllDiagnosisFilesFromPatientToPatient(int idPatient) {
+            DataOutputStream outputStream = null;
+
+            try {
+                // Abrir el flujo de salida para enviar los datos al cliente
+                outputStream = new DataOutputStream(socket.getOutputStream());
+
+                // Obtener todos los archivos de diagnóstico del paciente
+                List<DiagnosisFile> diagnosisFilesFromPatient = patientMan.getAllDiagnosisFilesFromPatient(idPatient);
+
+                // Si no hay archivos de diagnóstico, notificar al cliente
+                if (diagnosisFilesFromPatient.isEmpty()) {
+                    outputStream.writeUTF("No diagnosis files available for this patient.");
+                    outputStream.flush();
+                    return;
+                }
+
+                // Enviar al cliente la cantidad de archivos de diagnóstico disponibles
+                outputStream.writeUTF("All Diagnosis Files from Patient");
+                outputStream.writeInt(diagnosisFilesFromPatient.size());
+
+                // Usar un String normal para concatenar la lista de diagnóstico
+                String listDiagnosis = "";
+                for (DiagnosisFile diagnosisFile : diagnosisFilesFromPatient) {
+                    listDiagnosis += diagnosisFile.toString() + "\n";  // Concatenar la información de cada archivo
+                }
+
+                // Enviar la lista de archivos de diagnóstico al cliente
+                outputStream.writeUTF(listDiagnosis);
+
+                // Asegurarse de que todos los datos se hayan enviado correctamente
+                outputStream.flush();
+
+            } catch (IOException ex) {
+                // Manejo de excepciones en caso de errores durante el envío
+                Logger.getLogger(ServerThread.class.getName()).log(Level.SEVERE, "Error sending diagnosis files from patient", ex);
+                try {
+                    if (outputStream != null) {
+                        // Enviar un mensaje de error al cliente si ocurre una excepción
+                        outputStream.writeUTF("Error sending diagnosis files from patient.");
+                        outputStream.flush();
+                    }
+                } catch (IOException e) {
+                    Logger.getLogger(ServerThread.class.getName()).log(Level.SEVERE, "Error responding to client", e);
+                }
+            }
+        }
+
         private String serializeToCSV(List<Integer> list) {
             return list.stream().map(Object::toString).collect(Collectors.joining(","));
         }
 
     }
-    // SERVER DOCTOR THREAD
 
+    // SERVER DOCTOR THREAD
     private static class ServerDoctorThread implements Runnable {
         private final Socket socket;
         private final DataInputStream inputStream;
@@ -726,7 +775,7 @@ public class ServerThread {
                 // Parsear DOB en formato dd-MM-yyyy y convertir a yyyy-MM-dd para la DB
                 String dobForDb;
                 try {
-                    java.util.Date parsed = new SimpleDateFormat("dd-MM-yyyy").parse(birthday);
+                    Date parsed = new SimpleDateFormat("dd-MM-yyyy").parse(birthday);
                     dobForDb = new SimpleDateFormat("yyyy-MM-dd").format(parsed);
                 } catch (ParseException pe) {
                     outputStream.writeUTF("ERROR");
@@ -744,7 +793,7 @@ public class ServerThread {
                         int newUserId;
                         try (var psUser = c.prepareStatement(
                                 "INSERT INTO users (username, password, role) VALUES (?,?,?)",
-                                java.sql.Statement.RETURN_GENERATED_KEYS)) {
+                                Statement.RETURN_GENERATED_KEYS)) {
                             psUser.setString(1, username);
                             psUser.setString(2, encryptedPass);
                             psUser.setString(3, "DOCTOR");
@@ -772,7 +821,7 @@ public class ServerThread {
                         }
 
                         //
-                        try (java.sql.PreparedStatement psDoc = c.prepareStatement(
+                        try (PreparedStatement psDoc = c.prepareStatement(
                                 "INSERT INTO doctors (userId, nameDoctor, surnameDoctor, dniDoctor, dobDoctor, emailDoctor, sexDoctor, specialty, licenseNumber) VALUES (?,?,?,?,?,?,?,?,?)")) {
                             psDoc.setInt(1, newUserId);          // userId obtenido al crear el user
                             psDoc.setString(2, name);
@@ -1021,6 +1070,88 @@ public class ServerThread {
                 outputStream.flush();
             }
         }
+
+        public void SendDiagnosisFilesTODO(int idDoctor) {
+            DataOutputStream outputStream = null;
+
+            try {
+                outputStream = new DataOutputStream(socket.getOutputStream());
+
+                List<DiagnosisFile> diagnosisFilesTODO = doctorMan.listDiagnosisFilesTODO(idDoctor);
+
+                // Si no hay archivos recientemente terminados, notificar al cliente
+                if (diagnosisFilesTODO.isEmpty()) {
+                    outputStream.writeUTF("No recently finished diagnosis files available.");
+                    outputStream.flush();
+                    return;
+                }
+
+                // Enviar al cliente la cantidad de archivos de diagnóstico disponibles
+                outputStream.writeUTF("Recently Finished Diagnosis Files");
+                outputStream.writeInt(diagnosisFilesTODO.size());
+
+                String listDiagnosis = "";
+                for (DiagnosisFile diagnosisFile : diagnosisFilesTODO) {
+                    listDiagnosis += diagnosisFile.toString() + "\n";
+                }
+                outputStream.writeUTF(listDiagnosis);
+
+                outputStream.flush();  // Asegurarse de que todos los datos se han enviado
+
+            } catch (IOException ex) {
+                Logger.getLogger(ServerThread.class.getName()).log(Level.SEVERE, "Error sending recently finished diagnosis files", ex);
+                try {
+                    outputStream.writeUTF("Error sending recently finished diagnosis files.");
+                    outputStream.flush();
+                } catch (IOException e) {
+                    Logger.getLogger(ServerThread.class.getName()).log(Level.SEVERE, "Error responding to client", e);
+                }
+            }
+        }
+        public void sendAllDiagnosisFilesFromPatientToDoctor(int idPatient) {
+            DataOutputStream outputStream = null;
+
+            try {
+                outputStream = new DataOutputStream(socket.getOutputStream());
+
+                List<DiagnosisFile> diagnosisFilesFromPatient = doctorMan.getAllDiagnosisFilesFromPatient(idPatient);
+
+                if (diagnosisFilesFromPatient.isEmpty()) {
+                    outputStream.writeUTF("No diagnosis files available for this patient.");
+                    outputStream.flush();
+                    return;
+                }
+
+                outputStream.writeUTF("All Diagnosis Files from Patient");
+                outputStream.writeInt(diagnosisFilesFromPatient.size());
+
+                String listDiagnosis = "";
+                for (DiagnosisFile diagnosisFile : diagnosisFilesFromPatient) {
+                    listDiagnosis += diagnosisFile.toString() + "\n";  // Concatenar la información de cada archivo
+                }
+
+                // Enviar la lista de archivos de diagnóstico al cliente
+                outputStream.writeUTF(listDiagnosis);
+
+                // Asegurarse de que todos los datos se hayan enviado correctamente
+                outputStream.flush();
+
+            } catch (IOException ex) {
+                // Manejo de excepciones en caso de errores durante el envío
+                Logger.getLogger(ServerThread.class.getName()).log(Level.SEVERE, "Error sending diagnosis files from patient", ex);
+                try {
+                    if (outputStream != null) {
+                        // Enviar un mensaje de error al cliente si ocurre una excepción
+                        outputStream.writeUTF("Error sending diagnosis files from patient.");
+                        outputStream.flush();
+                    }
+                } catch (IOException e) {
+                    Logger.getLogger(ServerThread.class.getName()).log(Level.SEVERE, "Error responding to client", e);
+                }
+            }
+        }
+
+
     }
 
     public static String hashPassword(String password_plaintext) {
@@ -1033,13 +1164,12 @@ public class ServerThread {
     public static boolean checkPassword(String password_plaintext, String stored_hash) {
         boolean password_verified = false;
 
-        if(null == stored_hash || !stored_hash.startsWith("$2a$"))
-            throw new java.lang.IllegalArgumentException("Invalid hash provided for comparison");
+        if (null == stored_hash || !stored_hash.startsWith("$2a$"))
+            throw new IllegalArgumentException("Invalid hash provided for comparison");
 
         password_verified = BCrypt.checkpw(password_plaintext, stored_hash);
 
-        return(password_verified);
+        return (password_verified);
     }
-
 
 }
