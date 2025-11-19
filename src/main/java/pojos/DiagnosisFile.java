@@ -10,8 +10,6 @@ public class DiagnosisFile {
     private String medication;
     private LocalDate date;
     private int patientId;
-    private String sensorDataECG;
-    private String sensorDataEDA;
     private boolean status;
 
     public DiagnosisFile(int id) {
@@ -23,25 +21,15 @@ public class DiagnosisFile {
 
     }
 
-    public DiagnosisFile(int id, ArrayList<String> symptoms, String diagnosis, String medication, LocalDate date, int patientId) {
-        this.id = id;
-        this.symptoms = symptoms;
-        this.diagnosis = diagnosis;
-        this.medication = medication;
-        this.date = date;
-        this.patientId= patientId;
-    }
 
-    public DiagnosisFile(int id, ArrayList<String> symptoms, String diagnosis, String medication, LocalDate date, int patientId, String sensorDataECG, String sensorDataEDA) {
-        this.id = id;
-        this.symptoms = symptoms;
-        this.diagnosis = diagnosis;
-        this.medication = medication;
-        this.date = date;
+    public DiagnosisFile(int id, ArrayList<String> symptomsStr, String diagnosis, String medication, LocalDate date, int patientId, boolean status) {
+        this.id=id;
+        this.symptoms=symptomsStr;
+        this.diagnosis=diagnosis;
+        this.medication= medication;
+        this.date= date;
         this.patientId= patientId;
-        this.sensorDataECG = sensorDataECG;
-        this.sensorDataEDA = sensorDataEDA;
-        this.status = false;
+        this.status=status;
     }
 
     public int getId() {
@@ -92,21 +80,6 @@ public class DiagnosisFile {
         this.patientId = id;
     }
 
-    public String getSensorDataECG() {
-        return sensorDataECG;
-    }
-
-    public void setSensorDataECG(String sensorDataECG) {
-        this.sensorDataECG = sensorDataECG;
-    }
-
-    public String getSensorDataEDA() {
-        return sensorDataEDA;
-    }
-    public void setSensorDataEDA(String sensorDataEDA) {
-        this.sensorDataEDA = sensorDataEDA;
-    }
-
     public boolean getStatus() {
         return status;
     }
@@ -138,5 +111,6 @@ public class DiagnosisFile {
     public int hashCode() {
         return Objects.hash(id);
     }
+
 
 }

@@ -11,6 +11,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -29,7 +30,7 @@ public class JDBCDoctorManager implements DoctorManager {
             throw new RuntimeException(e);
         }
     }
-
+/**
     @Override
     public List <DiagnosisFile> listRecentlyFinishedFiles(){
         List<DiagnosisFile> recentFiles = new ArrayList<>();
@@ -59,8 +60,9 @@ public class JDBCDoctorManager implements DoctorManager {
             throw new RuntimeException(e);
         }
         return recentFiles;
-    }
+    }*/
 
+    /**
     @Override
     public List <DiagnosisFile> listAllFinishedFiles(){
         List<DiagnosisFile> recentFiles = new ArrayList<>();
@@ -91,13 +93,17 @@ public class JDBCDoctorManager implements DoctorManager {
         }
         return recentFiles;
     }
-
+*/
     @Override
     public void downloadFileInComputer(DiagnosisFile diagnosisFile) throws IOException {
+        // Define the file name based on the diagnosis
         String fileName = diagnosisFile.getDiagnosis() + ".csv";
 
         try (FileWriter writer = new FileWriter(fileName)) {
+            // Write header to the CSV file
             writer.write("ID,PatientID,Diagnosis,Medication,Date,Status\n");
+
+            // Write DiagnosisFile data to the CSV file
             writer.write(diagnosisFile.getId() + "," +
                     diagnosisFile.getPatientId() + "," +
                     diagnosisFile.getDiagnosis() + "," +
@@ -105,19 +111,14 @@ public class JDBCDoctorManager implements DoctorManager {
                     diagnosisFile.getDate() + "," +
                     diagnosisFile.getStatus() + "\n\n");
 
+            // Write Symptoms section
             writer.write("Symptoms:\n");
-            for (String symptom : diagnosisFile.getSymptoms()) {
-                writer.write("- " + symptom + "\n");
-            }
-            writer.write("\nSensor Data:\n");
-            writer.write("ECG,EDA\n");
-
-            String[] ecgValues = diagnosisFile.getSensorDataECG().split(",");
-            String[] edaValues = diagnosisFile.getSensorDataEDA().split(",");
-
-            int len = Math.min(ecgValues.length, edaValues.length);
-            for (int i = 0; i < len; i++) {
-                writer.write(ecgValues[i] + "," + edaValues[i] + "\n");
+            if (diagnosisFile.getSymptoms() != null && !diagnosisFile.getSymptoms().isEmpty()) {
+                for (String symptom : diagnosisFile.getSymptoms()) {
+                    writer.write("- " + symptom + "\n");
+                }
+            } else {
+                writer.write("No symptoms provided.\n");
             }
 
             System.out.println("Archivo descargado correctamente: " + fileName);
@@ -125,6 +126,7 @@ public class JDBCDoctorManager implements DoctorManager {
     }
 
 
+    /**
     public List<DiagnosisFile> getDiagnosisFilesByPatientId(int patientId) {
         List<DiagnosisFile> diagnosisFiles = new ArrayList<>();
         try {
@@ -153,7 +155,7 @@ public class JDBCDoctorManager implements DoctorManager {
         }
         return diagnosisFiles;
     }
-
+*/
 
     public Patient getPatientByHIN(int healthInsuranceNumber) throws SQLException {
         String sql = "SELECT * FROM patients WHERE healthInsuranceNumberPatient = ?";
@@ -201,18 +203,30 @@ public class JDBCDoctorManager implements DoctorManager {
     @Override
     public void modifyDiagnosisFile(DiagnosisFile diagnosisFile) {
         try {
-            String template = "UPDATE diagnosisFile SET symptoms = ?, diagnosis = ?, medication = ?, date = ?, patientId = ?, WHERE id = ?;";
-            PreparedStatement ps;
-            ps = c.prepareStatement(template);
-            String symptomsSerialized = diagnosisFile.getSymptoms() == null ? null :
-                    diagnosisFile.getSymptoms().stream().map(Object::toString).collect(Collectors.joining(", "));
+            // SQL query to update the diagnosis file
+            String template = "UPDATE diagnosisFiles SET symptoms = ?, diagnosis = ?, medication = ?, date = ?, patientId = ?, status = ? WHERE id = ?;";
+
+            // Prepare the statement
+            PreparedStatement ps = c.prepareStatement(template);
+
+            // Serialize the symptoms list into a comma-separated string
+            String symptomsSerialized = (diagnosisFile.getSymptoms() == null || diagnosisFile.getSymptoms().isEmpty())
+                    ? null
+                    : String.join(", ", diagnosisFile.getSymptoms());
+
+            // Set the parameters in the prepared statement
             ps.setString(1, symptomsSerialized);
             ps.setString(2, diagnosisFile.getDiagnosis());
             ps.setString(3, diagnosisFile.getMedication());
-            ps.setDate(4, java.sql.Date.valueOf(diagnosisFile.getDate()));
+            ps.setDate(4, java.sql.Date.valueOf(diagnosisFile.getDate()));  // Convert LocalDate to SQL Date
             ps.setInt(5, diagnosisFile.getPatientId());
-            ps.setInt(6, diagnosisFile.getId());
+            ps.setBoolean(6, diagnosisFile.getStatus());  // Assuming 'status' is a boolean
+            ps.setInt(7, diagnosisFile.getId());  // Set the ID for updating the correct record
+
+            // Execute the update
             ps.executeUpdate();
+
+            // Close the prepared statement
             ps.close();
         } catch (SQLException e) {
             System.out.println("Error in the database");
@@ -220,6 +234,7 @@ public class JDBCDoctorManager implements DoctorManager {
         }
     }
 
+/**
     @Override
     public void deleteDiagnosisFile(int  id) {
         try {
@@ -234,14 +249,95 @@ public class JDBCDoctorManager implements DoctorManager {
             e.printStackTrace();
         }
     }
-
+*/
     @Override
-    public List<DiagnosisFile> listDiagnosisFilesTODO(int idDoctor){
-        return null;
+    public List<DiagnosisFile> listDiagnosisFilesTODO(int idDoctor) {
+        List<DiagnosisFile> diagnosisFiles = new ArrayList<>();
+
+        String sql = "SELECT df.id, df.symptoms, df.diagnosis, df.medication, df.date, df.patientId, df.status " +
+                "FROM diagnosisFiles df " +
+                "JOIN patients p ON df.patientId = p.id " +
+                "WHERE df.status = FALSE AND p.doctorId = ?";
+
+        try (PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setInt(1, idDoctor);
+
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    int id = rs.getInt("id");
+                    ArrayList<String> symptoms = new ArrayList<>();
+                    String symptomsStr = rs.getString("symptoms");
+                    if (symptomsStr != null && !symptomsStr.isEmpty()) {
+                        for (String symptom : symptomsStr.split(",")) {
+                            symptoms.add(symptom.trim());
+                        }
+                    }
+                    String diagnosis = rs.getString("diagnosis");
+                    String medication = rs.getString("medication");
+                    LocalDate date = rs.getDate("date").toLocalDate();
+                    int patientId = rs.getInt("patientId");
+                    boolean status = rs.getBoolean("status");
+
+                    DiagnosisFile diagnosisFile = new DiagnosisFile(id, symptoms, diagnosis, medication, date, patientId, status);
+                    diagnosisFiles.add(diagnosisFile);
+                }
+            } catch (SQLException e) {
+                e.printStackTrace();
+                // Manejo adicional si lo consideras necesario
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            // Manejo adicional si lo consideras necesario
+        }
+
+        return diagnosisFiles;
     }
 
+
+
     @Override
-    public List<DiagnosisFile> getAllDiagnosisFilesFromPatient(int idPatient){
-        return null;
+    public List<DiagnosisFile> getAllDiagnosisFilesFromPatient(int idPatient) {
+        List<DiagnosisFile> diagnosisFiles = new ArrayList<>();
+
+        String sql = "SELECT df.id, df.symptoms, df.diagnosis, df.medication, df.date, df.patientId, df.status " +
+                "FROM diagnosisFiles df " +
+                "WHERE df.patientId = ?";
+
+        try (PreparedStatement ps = c.prepareStatement(sql)) {
+            // Establecer el id del paciente en la consulta
+            ps.setInt(1, idPatient);
+
+            try (ResultSet rs = ps.executeQuery()) {
+                // Procesar los resultados
+                while (rs.next()) {
+                    int id = rs.getInt("id");
+                    ArrayList<String> symptoms = new ArrayList<>();
+                    String symptomsStr = rs.getString("symptoms");
+                    if (symptomsStr != null && !symptomsStr.isEmpty()) {
+                        for (String symptom : symptomsStr.split(",")) {
+                            symptoms.add(symptom.trim());
+                        }
+                    }
+                    String diagnosis = rs.getString("diagnosis");
+                    String medication = rs.getString("medication");
+                    LocalDate date = rs.getDate("date").toLocalDate();
+                    int patientId = rs.getInt("patientId");
+                    boolean status = rs.getBoolean("status");
+
+                    // Crear el objeto DiagnosisFile y agregarlo a la lista
+                    DiagnosisFile diagnosisFile = new DiagnosisFile(id, symptoms, diagnosis, medication, date, patientId, status);
+                    diagnosisFiles.add(diagnosisFile);
+                }
+            } catch (SQLException e) {
+                e.printStackTrace();
+                // Manejo de errores si es necesario
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            // Manejo de errores si es necesario
+        }
+
+        return diagnosisFiles;
     }
+
 }

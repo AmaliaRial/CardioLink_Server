@@ -91,16 +91,24 @@ public class ConnectionManager {
                     "FOREIGN KEY(userId) REFERENCES users(idUser)" +
                     ");");
 
-            st.execute("CREATE TABLE IF NOT EXISTS diagnosisFile (" +
-                    "id INTEGER PRIMARY KEY AUTOINCREMENT," +
+            st.execute("CREATE TABLE IF NOT EXISTS diagnosisFiles (" +
+                    "idDiagnosisFile INTEGER PRIMARY KEY AUTOINCREMENT," +
                     "symptoms TEXT," +
                     "diagnosis TEXT," +
                     "medication TEXT," +
                     "date DATE NOT NULL," +
                     "patientId INTEGER," +
-                    "sensorDataECG TEXT," +
-                    "sensorDataEDA TEXT," +
+                    "status BOOLEAN," +
                     "FOREIGN KEY(patientId) REFERENCES patients(idPatient) ON DELETE CASCADE" +
+                    ");");
+
+            st.execute("CREATE TABLE IF NOT EXISTS recordings (" +
+                    "id_recording INTEGER PRIMARY KEY," +
+                    "diagnosisFileId INTEGER," +
+                    "data TEXT," +
+                    "sequence INTEGER," +
+                    "anomaly BOOLEAN," +
+                    "FOREIGN KEY(diagnosisFileId) REFERENCES diagnosisFile(idDiagnosisFile) ON DELETE CASCADE" +
                     ");");
 
             st.execute("PRAGMA foreign_keys = ON");
