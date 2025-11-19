@@ -377,6 +377,10 @@ public class JDBCDoctorManager implements DoctorManager {
         }
     }
 
+    @Override
+    public String getFracmentofRecoring(int idDiagnosisFile, int position) {
+        return "";
+    }
 
 
 }

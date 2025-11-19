@@ -15,5 +15,6 @@ public interface DoctorManager {
     List<DiagnosisFile> listDiagnosisFilesTODO(int idDoctor);
     List<DiagnosisFile>  getAllDiagnosisFilesFromPatient(int idPatient);
     void UpDateDiagnosisFile(DiagnosisFile diagnosisfile)throws SQLException;
+    String getFracmentofRecoring(int idDiagnosisFile, int position);
 }
 
