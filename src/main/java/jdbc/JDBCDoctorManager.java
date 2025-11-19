@@ -13,9 +13,8 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.LocalDate;
 import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
-import java.util.stream.Collectors;
 
 public class JDBCDoctorManager implements DoctorManager {
 
@@ -378,9 +377,64 @@ public class JDBCDoctorManager implements DoctorManager {
     }
 
     @Override
-    public String getFracmentofRecoring(int idDiagnosisFile, int position) {
-        return "";
+    public String getFracmentofRecoring(int idDiagnosisFile, int position) throws SQLException {
+        String sql = "SELECT data FROM recordings WHERE diagnosisFileId = ? AND sequence = ?";
+
+        try (Connection c = conMan.getConnection();  // Assuming conMan.getConnection() returns a valid DB connection
+             PreparedStatement ps = c.prepareStatement(sql)) {
+
+            // Set the parameters for the prepared statement
+            ps.setInt(1, idDiagnosisFile);  // Set the diagnosisFileId
+            ps.setInt(2, position);  // Set the sequence/position of the recording
+
+            // Execute the query
+            ResultSet rs = ps.executeQuery();
+
+            // Check if we have a result
+            if (rs.next()) {
+                // Return the recording fragment (data)
+                return rs.getString("data");
+            } else {
+                // If no result is found, return null or an appropriate message
+                return "No fragment found for the given DiagnosisFileId and position.";
+            }
+
+        } catch (SQLException e) {
+            System.out.println("Error retrieving fragment from the database.");
+            e.printStackTrace();
+            return null;  // Return null or handle the error as needed
+        }
     }
+    @Override
+    public List<Boolean> getSateOfFragmentsOfRecordingByID(int idDiagnosisFile) throws SQLException {
+        List<Boolean> anomalyStates = new ArrayList<>();  // List to store the anomaly states
+
+        String sql = "SELECT anomaly FROM recordings WHERE diagnosisFileId = ?";
+
+        try (Connection c = conMan.getConnection();  // Assuming conMan.getConnection() returns a valid DB connection
+             PreparedStatement ps = c.prepareStatement(sql)) {
+
+            // Set the parameter for the prepared statement (diagnosisFileId)
+            ps.setInt(1, idDiagnosisFile);
+
+            // Execute the query
+            ResultSet rs = ps.executeQuery();
+
+            // Iterate through the result set and collect anomaly states
+            while (rs.next()) {
+                boolean anomaly = rs.getBoolean("anomaly");
+                anomalyStates.add(anomaly);  // Add the anomaly state to the list
+            }
+
+        } catch (SQLException e) {
+            System.out.println("Error retrieving anomaly states from the database.");
+            e.printStackTrace();
+            return Collections.emptyList();  // Return an empty list in case of an error
+        }
+
+        return anomalyStates;
+    }
+
 
 
 }

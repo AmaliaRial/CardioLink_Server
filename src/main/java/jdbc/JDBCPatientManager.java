@@ -13,6 +13,7 @@ import java.sql.Statement;
 import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
  public class JDBCPatientManager implements PatientManager {
@@ -225,8 +226,95 @@ import java.util.List;
      }
 
      @Override
-     public String getFracmentofRecoring(int idDiagnosisFile, int position) {
-         String string = new String();
-         return string;
+     public String getFracmentofRecoring(int idDiagnosisFile, int position)throws SQLException {
+         String sql = "SELECT data FROM recordings WHERE diagnosisFileId = ? AND sequence = ?";
+
+         try (Connection c = conMan.getConnection();  // Assuming conMan.getConnection() returns a valid DB connection
+              PreparedStatement ps = c.prepareStatement(sql)) {
+
+             // Set the parameters for the prepared statement
+             ps.setInt(1, idDiagnosisFile);  // Set the diagnosisFileId
+             ps.setInt(2, position);  // Set the sequence/position of the recording
+
+             // Execute the query
+             ResultSet rs = ps.executeQuery();
+
+             // Check if we have a result
+             if (rs.next()) {
+                 // Return the recording fragment (data)
+                 return rs.getString("data");
+             } else {
+                 // If no result is found, return null or an appropriate message
+                 return "No fragment found for the given DiagnosisFileId and position.";
+             }
+
+         } catch (SQLException e) {
+             System.out.println("Error retrieving fragment from the database.");
+             e.printStackTrace();
+             return null;  // Return null or handle the error as needed
+         }
      }
+
+     @Override
+     public List<Boolean> getSateOfFragmentsOfRecordingByID(int idDiagnosisFile) throws SQLException {
+         List<Boolean> anomalyStates = new ArrayList<>();  // List to store the anomaly states
+
+         String sql = "SELECT anomaly FROM recordings WHERE diagnosisFileId = ?";
+
+         try (Connection c = conMan.getConnection();  // Assuming conMan.getConnection() returns a valid DB connection
+              PreparedStatement ps = c.prepareStatement(sql)) {
+
+             // Set the parameter for the prepared statement (diagnosisFileId)
+             ps.setInt(1, idDiagnosisFile);
+
+             // Execute the query
+             ResultSet rs = ps.executeQuery();
+
+             // Iterate through the result set and collect anomaly states
+             while (rs.next()) {
+                 boolean anomaly = rs.getBoolean("anomaly");
+                 anomalyStates.add(anomaly);  // Add the anomaly state to the list
+             }
+
+         } catch (SQLException e) {
+             System.out.println("Error retrieving anomaly states from the database.");
+             e.printStackTrace();
+             return Collections.emptyList();  // Return an empty list in case of an error
+         }
+
+         return anomalyStates;
+     }
+
+     @Override
+     public void AddNewDiagnosisFile(DiagnosisFile diagnosisFile) throws SQLException {
+         String sql = "INSERT INTO diagnosisFiles (symptoms, diagnosis, medication, date, patientId, status) " +
+                 "VALUES (?, ?, ?, ?, ?, ?)";
+
+         try (Connection c = conMan.getConnection();  // Assuming conMan.getConnection() returns a valid DB connection
+              PreparedStatement ps = c.prepareStatement(sql)) {
+
+             // Serialize the symptoms list into a comma-separated string
+             String symptomsSerialized = (diagnosisFile.getSymptoms() == null || diagnosisFile.getSymptoms().isEmpty())
+                     ? null
+                     : String.join(", ", diagnosisFile.getSymptoms());
+
+             // Set the parameters for the prepared statement
+             ps.setString(1, symptomsSerialized);
+             ps.setString(2, diagnosisFile.getDiagnosis());
+             ps.setString(3, diagnosisFile.getMedication());
+             ps.setDate(4, java.sql.Date.valueOf(diagnosisFile.getDate()));  // Convert LocalDate to SQL Date
+             ps.setInt(5, diagnosisFile.getPatientId());
+             ps.setBoolean(6, diagnosisFile.getStatus());  // Assuming 'status' is a boolean
+
+             // Execute the insert
+             ps.executeUpdate();
+             System.out.println("New DiagnosisFile added successfully.");
+
+         } catch (SQLException e) {
+             System.out.println("Error adding new DiagnosisFile to the database.");
+             e.printStackTrace();
+         }
+     }
+
+
  }
