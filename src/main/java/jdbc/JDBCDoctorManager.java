@@ -340,4 +340,9 @@ public class JDBCDoctorManager implements DoctorManager {
         return diagnosisFiles;
     }
 
+    @Override
+    public void UpDateDiagnosisFile(DiagnosisFile diagnosisfile) {
+
+    }
+
 }
