@@ -9,5 +9,6 @@ import java.util.List;
 public interface PatientManager {
     void addPatient(Patient p) throws SQLException;
     Patient getPatientByUserId(int userId) throws SQLException;
-    List<DiagnosisFile> getAllDiagnosisFilesFromPatient(int idPatient);
+    List<DiagnosisFile> getAllDiagnosisFilesFromPatient(int idPatient)throws SQLException;
+    String getFracmentofRecoring(int idDiagnosisFile, int position);
 }

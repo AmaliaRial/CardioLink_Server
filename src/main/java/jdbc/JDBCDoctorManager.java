@@ -341,8 +341,42 @@ public class JDBCDoctorManager implements DoctorManager {
     }
 
     @Override
-    public void UpDateDiagnosisFile(DiagnosisFile diagnosisfile) {
+    public void UpDateDiagnosisFile(DiagnosisFile diagnosisFile) throws SQLException {
+        String sql = "UPDATE diagnosisFiles SET symptoms = ?, diagnosis = ?, medication = ?, date = ?, patientId = ?, status = ? WHERE id = ?";
 
+        try (Connection c = conMan.getConnection();
+             PreparedStatement ps = c.prepareStatement(sql)) {
+
+            // Serialize the symptoms list into a comma-separated string
+            String symptomsSerialized = (diagnosisFile.getSymptoms() == null || diagnosisFile.getSymptoms().isEmpty())
+                    ? null
+                    : String.join(", ", diagnosisFile.getSymptoms());
+
+            // Set parameters for the prepared statement
+            ps.setString(1, symptomsSerialized);
+            ps.setString(2, diagnosisFile.getDiagnosis());
+            ps.setString(3, diagnosisFile.getMedication());
+            ps.setDate(4, java.sql.Date.valueOf(diagnosisFile.getDate()));  // Convert LocalDate to SQL Date
+            ps.setInt(5, diagnosisFile.getPatientId());
+            ps.setBoolean(6, diagnosisFile.getStatus());  // Assuming 'status' is a boolean
+            ps.setInt(7, diagnosisFile.getId());  // Set the ID to identify the record to update
+
+            // Execute the update
+            int rowsUpdated = ps.executeUpdate();
+
+            // Check if any rows were updated
+            if (rowsUpdated > 0) {
+                System.out.println("DiagnosisFile updated successfully with ID: " + diagnosisFile.getId());
+            } else {
+                System.out.println("No DiagnosisFile found with ID: " + diagnosisFile.getId());
+            }
+
+        } catch (SQLException e) {
+            System.out.println("Error updating DiagnosisFile in the database.");
+            e.printStackTrace();
+        }
     }
+
+
 
 }
