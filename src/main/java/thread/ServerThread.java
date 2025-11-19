@@ -521,8 +521,8 @@ public class ServerThread {
                 DiagnosisFile diag = new DiagnosisFile(0);
                 diag.setPatientId(loggedPatient.getIdPatient());
                 diag.setDate(LocalDate.now());
-                diag.setSensorDataECG(serializeToCSV(ECG));
-                diag.setSensorDataEDA(serializeToCSV(EDA));
+                //diag.setSensorDataECG(serializeToCSV(ECG));
+               // diag.setSensorDataEDA(serializeToCSV(EDA));
                 diag.setSymptoms(currentSymptoms);
                 diag.setDiagnosis("Pending"); // default, doctor modifies later
                 diag.setMedication("Pending");
@@ -578,8 +578,8 @@ public class ServerThread {
                 ps.setString(3, file.getMedication());
                 ps.setDate(4, java.sql.Date.valueOf(file.getDate()));
                 ps.setInt(5, file.getPatientId());
-                ps.setString(6, file.getSensorDataECG());
-                ps.setString(7, file.getSensorDataEDA());
+                //ps.setString(6, file.getSensorDataECG());
+                //ps.setString(7, file.getSensorDataEDA());
                 ps.executeUpdate();
             }
         }
@@ -737,8 +737,6 @@ public class ServerThread {
         }
 
 
-
-
         private void handleSignup() throws IOException {
             try {
                 String username = inputStream.readUTF();
@@ -844,7 +842,10 @@ public class ServerThread {
                         outputStream.flush();
                         return;
                     } catch (SQLException ex) {
-                        try { c.rollback(); } catch (SQLException ignore) {}
+                        try {
+                            c.rollback();
+                        } catch (SQLException ignore) {
+                        }
                         String msg = ex.getMessage() != null ? ex.getMessage() : ex.toString();
                         if (msg.contains("UNIQUE") || msg.contains("constraint failed")) {
                             outputStream.writeUTF("ERROR");
@@ -856,7 +857,10 @@ public class ServerThread {
                         outputStream.flush();
                         return;
                     } finally {
-                        try { c.setAutoCommit(true); } catch (SQLException ignore) {}
+                        try {
+                            c.setAutoCommit(true);
+                        } catch (SQLException ignore) {
+                        }
                     }
                 }
             } catch (Exception ex) {
@@ -865,7 +869,6 @@ public class ServerThread {
                 outputStream.flush();
             }
         }
-
 
 
         private void handleLogin() throws IOException {
@@ -1108,6 +1111,7 @@ public class ServerThread {
                 }
             }
         }
+
         public void sendAllDiagnosisFilesFromPatientToDoctor(int idPatient) {
             DataOutputStream outputStream = null;
 
@@ -1151,8 +1155,87 @@ public class ServerThread {
             }
         }
 
+        public DiagnosisFile ReciveAndUpdateDiagnosisFile() {
+            DiagnosisFile updatedDiagnosisFile = null;
 
+            try {
+                // Leer el diagnóstico actualizado enviado por el cliente
+                DataInputStream inputStream = new DataInputStream(socket.getInputStream());
+                String diagnosisString = inputStream.readUTF();
+
+                // Convertir el String recibido en un objeto DiagnosisFile
+                updatedDiagnosisFile = convertStringToDiagnosisFile(diagnosisString);
+
+                // Actualizar el diagnóstico en el DoctorManager
+                doctorMan.UpDateDiagnosisFile(updatedDiagnosisFile);
+
+                // Confirmación de que el diagnóstico fue actualizado correctamente
+                DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream());
+                outputStream.writeUTF("Diagnosis file updated successfully.");
+                outputStream.flush();
+
+            } catch (IOException e) {
+                System.out.println("Error receiving and updating diagnosis file: " + e.getMessage());
+            }
+
+            return updatedDiagnosisFile;
+        }
+
+        private DiagnosisFile convertStringToDiagnosisFile(String diagnosisString) {
+            // Eliminar la parte inicial y final del String (MedicalRecord{...})
+            diagnosisString = diagnosisString.replace("MedicalRecord{", "")
+                    .replace("}", "");
+
+            // Dividir la cadena en partes separadas por coma
+            String[] parts = diagnosisString.split(", ");
+
+            // Crear un objeto DiagnosisFile
+            DiagnosisFile diagnosisFile = new DiagnosisFile();
+
+            // Asignar los valores de cada parte al objeto DiagnosisFile
+            for (String part : parts) {
+                String[] keyValue = part.split("=");
+                String key = keyValue[0].trim();
+                String value = keyValue[1].trim().replace("'", "");
+
+                // Asignar los valores al objeto DiagnosisFile
+                switch (key) {
+                    case "id":
+                        diagnosisFile.setId(Integer.parseInt(value));
+                        break;
+                    case "symptoms":
+                        // Convertir los síntomas a un ArrayList<String>
+                        ArrayList<String> symptomsList = new ArrayList<>();
+                        for (String symptom : value.split(",")) {
+                            symptomsList.add(symptom.trim());
+                        }
+                        diagnosisFile.setSymptoms(symptomsList);
+                        break;
+                    case "diagnosis":
+                        diagnosisFile.setDiagnosis(value);
+                        break;
+                    case "medication":
+                        diagnosisFile.setMedication(value);
+                        break;
+                    case "date":
+                        diagnosisFile.setDate(LocalDate.parse(value));
+                        break;
+                    case "patient id":
+                        diagnosisFile.setPatientId(Integer.parseInt(value));
+                        break;
+                    case "status":
+                        diagnosisFile.setStatus(Boolean.parseBoolean(value));
+                        break;
+                }
+            }
+            return diagnosisFile;
+        }
+        public void sendFragmentofRecording(){
+
+        }
     }
+
+
 
     public static String hashPassword(String password_plaintext) {
         String salt = BCrypt.gensalt(workload);
