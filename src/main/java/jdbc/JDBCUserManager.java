@@ -184,6 +184,42 @@ public class JDBCUserManager implements UserManager{
         return role;
     }
 
+    @Override
+    public String getPassword(String username) {
+        String password = null;
+        String sql = "SELECT password FROM users WHERE username = ?";
+        try (PreparedStatement pstmt = conMan.getConnection().prepareStatement(sql)) {
+            pstmt.setString(1, username);
+            ResultSet rs = pstmt.executeQuery();
+            if (rs.next()) {
+                password = rs.getString("password");
+            }
+        } catch (SQLException e) {
+            System.out.println("Error in the database");
+            e.printStackTrace();
+        }
+        return password;
+    }
+
+    @Override
+    public int getUserId(String username) {
+        int id = 0;
+        String sql = "SELECT userId FROM users WHERE username = ?";
+        try (PreparedStatement pstmt = conMan.getConnection().prepareStatement(sql)) {
+            pstmt.setString(1, username);
+            ResultSet rs = pstmt.executeQuery();
+            if (rs.next()) {
+                id = rs.getInt("userId");
+            }
+        } catch (SQLException e) {
+            System.out.println("Error in the database");
+            e.printStackTrace();
+        }
+        return id;
+    }
+
+
+
     public List<String> getAllUsers() {
         List<String> users = new ArrayList<>();
         String sql = "SELECT username FROM users";

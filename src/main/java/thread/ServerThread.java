@@ -393,42 +393,48 @@ public class ServerThread {
                 return;
             }
 
-            Patient p = new Patient();
-            p.setNamePatient(name);
-            p.setSurnamePatient(surname);
-            p.setEmailPatient(email);
-            p.setDniPatient(dniClean);
-
-            try {
-                p.setSexPatient(parseSex(sex));
-            } catch (IllegalArgumentException ex) {
-                outputStream.writeUTF("ERROR");
-                outputStream.writeUTF("Invalid sex value: " + ex.getMessage());
-                outputStream.flush();
-                return;
-            }
-
-            p.setPhoneNumberPatient(Integer.parseInt(phone));
-            p.setHealthInsuranceNumberPatient(Integer.parseInt(insurance));
-
-            // Parse fecha en formato dd-MM-yyyy
-            try {
-                Date parsedDob = new SimpleDateFormat("dd-MM-yyyy").parse(birthday);
-                p.setDobPatient(parsedDob);
-            } catch (ParseException pe) {
-                outputStream.writeUTF("ERROR");
-                outputStream.writeUTF("Invalid birthday format. Use dd-MM-yyyy (ej: 31-12-1990).");
-                outputStream.flush();
-                return;
-            }
-
-            p.setEmergencyContactPatient(Integer.parseInt(emergencyContact));
 
 
             String encryptedPass = hashPassword(password);
             try {
-                patientMan.addPatient(p);
                 userMan.register(username, encryptedPass, "PATIENT");
+                int userId = userMan.getUserId(username);
+
+                Patient p = new Patient();
+                p.setUserId(userId);
+                p.setNamePatient(name);
+                p.setSurnamePatient(surname);
+                p.setEmailPatient(email);
+                p.setDniPatient(dniClean);
+
+                try {
+                    p.setSexPatient(parseSex(sex));
+                } catch (IllegalArgumentException ex) {
+                    outputStream.writeUTF("ERROR");
+                    outputStream.writeUTF("Invalid sex value: " + ex.getMessage());
+                    outputStream.flush();
+                    return;
+                }
+
+                p.setPhoneNumberPatient(Integer.parseInt(phone));
+                p.setHealthInsuranceNumberPatient(Integer.parseInt(insurance));
+
+                // Parse fecha en formato dd-MM-yyyy
+                try {
+                    Date parsedDob = new SimpleDateFormat("dd-MM-yyyy").parse(birthday);
+                    p.setDobPatient(parsedDob);
+                } catch (ParseException pe) {
+                    outputStream.writeUTF("ERROR");
+                    outputStream.writeUTF("Invalid birthday format. Use dd-MM-yyyy (ej: 31-12-1990).");
+                    outputStream.flush();
+                    return;
+                }
+
+                p.setEmergencyContactPatient(Integer.parseInt(emergencyContact));
+
+
+                patientMan.addPatient(p);
+
                 outputStream.writeUTF("ACK");
                 outputStream.writeUTF("Sign up successful. You can log in now.");
                 outputStream.flush();
@@ -443,7 +449,7 @@ public class ServerThread {
             if (sexStr == null) {
                 throw new IllegalArgumentException("Sex value is null");
             }
-            String s = sexStr.trim().toUpperCase();
+            String s = sexStr.toUpperCase();
 
             // Map common cases
             if (s.equals("M") || s.equals("MALE") || s.equals("MAN") || s.equals("H") || s.equals("HOMBRE")) {
@@ -467,7 +473,8 @@ public class ServerThread {
                 String username = inputStream.readUTF();
                 String password = inputStream.readUTF();
                 //boolean logged = userMan.verifyPassword(username, password);
-                boolean logged = checkPassword(password, hash);
+                String storedpw = userMan.getPassword(username);
+                boolean logged = checkPassword(password, storedpw);
                 if (logged) {
                     User u = userMan.getUserByUsername(username);
                     int userId = u.getIdUser();
@@ -789,11 +796,11 @@ public class ServerThread {
 
                     switch (command) {
                         case "SIGNUP":
-                            handleSignup();
+                            handleSignupDoctor();
                             break;
 
                         case "LOGIN":
-                            handleLogin();
+                            handleLoginDoctor();
                             break;
 
                         case "LIST_PATIENTS":
@@ -842,7 +849,7 @@ public class ServerThread {
         }
 
 
-        private void handleSignup() throws IOException {
+        private void handleSignupDoctor() throws IOException {
             try {
                 String username = inputStream.readUTF();
                 String password = inputStream.readUTF();
@@ -976,11 +983,12 @@ public class ServerThread {
         }
 
 
-        private void handleLogin() throws IOException {
+        private void handleLoginDoctor() throws IOException {
             try {
                 String username = inputStream.readUTF();
                 String password = inputStream.readUTF();
-                boolean logged = checkPassword(password, hash);
+                String storedpw = userMan.getPassword(username);
+                boolean logged = checkPassword(password, storedpw);
 
                 outputStream.writeUTF("LOGIN_RESULT");
 

@@ -154,8 +154,8 @@ import java.util.List;
 
                  if (sexStr != null) {
                      try {
-                         if (sexStr.equalsIgnoreCase("M")) sexEnum = Sex.MALE;
-                         else if (sexStr.equalsIgnoreCase("F")) sexEnum = Sex.FEMALE;
+                         if (sexStr.equalsIgnoreCase("MALE")) sexEnum = Sex.MALE;
+                         else if (sexStr.equalsIgnoreCase("FEMALE")) sexEnum = Sex.FEMALE;
                          else sexEnum = Sex.valueOf(sexStr.toUpperCase());
                      } catch (IllegalArgumentException e) {
                          System.out.println("⚠️ Invalid sex value in DB: " + sexStr);
