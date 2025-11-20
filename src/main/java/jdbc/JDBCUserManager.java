@@ -16,7 +16,7 @@ public class JDBCUserManager implements UserManager{
     }
 
 
-
+    /*
     public boolean createUser(String username, String encryptedPassword, Role role) {
         Connection conn = null;
         try {
@@ -84,7 +84,7 @@ public class JDBCUserManager implements UserManager{
                 if (conn != null) conn.setAutoCommit(true);
             } catch (SQLException ignored) {}
         }
-    }
+    }*/
 
     @Override
     public void register(String username, String encryptedPassword, String role) {
@@ -94,9 +94,14 @@ public class JDBCUserManager implements UserManager{
         } catch (Exception ex) {
             r = Role.PATIENT;
         }
-        boolean ok = createUser(username, encryptedPassword, r);
-        if (!ok) {
-            System.out.println("Registro fallido para usuario: " + username);
+        String query = "INSERT INTO users (username, password, role) VALUES (?, ?, ?)";
+        try (Connection c = conMan.getConnection(); PreparedStatement ps = c.prepareStatement(query)) {
+            ps.setString(1, username);
+            ps.setString(2, encryptedPassword);
+            ps.setString(3, r.name());
+            ps.executeUpdate();
+        }catch (SQLException e) {
+        System.out.println("Error registering user: " + e.getMessage());
         }
     }
 
@@ -204,12 +209,12 @@ public class JDBCUserManager implements UserManager{
     @Override
     public int getUserId(String username) {
         int id = 0;
-        String sql = "SELECT userId FROM users WHERE username = ?";
+        String sql = "SELECT idUser FROM users WHERE username = ?";
         try (PreparedStatement pstmt = conMan.getConnection().prepareStatement(sql)) {
             pstmt.setString(1, username);
             ResultSet rs = pstmt.executeQuery();
             if (rs.next()) {
-                id = rs.getInt("userId");
+                id = rs.getInt("idUser");
             }
         } catch (SQLException e) {
             System.out.println("Error in the database");

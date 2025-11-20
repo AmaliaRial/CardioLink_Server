@@ -14,7 +14,7 @@ import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.util.ArrayList;
-import java.util.Date;
+import java.sql.Date;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -28,7 +28,7 @@ public class ServerThread {
     private static final String DataBase_Address = "jdbc:sqlite:CardioLink.db";
     private static final int port = 9000;
     private static int workload = 12;
-    private static String hash = "$2a$06$.rCVZVOThsIa96pEDOxvGuRRgzG64bnptJ0938xuqzv18d3ZpQhstC";
+    //private static String hash = "$2a$06$.rCVZVOThsIa96pEDOxvGuRRgzG64bnptJ0938xuqzv18d3ZpQhstC";
 
 
     public static void main(String[] args) throws IOException, SQLException {
@@ -422,40 +422,24 @@ public class ServerThread {
                 userMan.register(username, encryptedPass, "PATIENT");
                 int userId = userMan.getUserId(username);
 
-                Patient p = new Patient();
-                p.setUserId(userId);
-                p.setNamePatient(name);
-                p.setSurnamePatient(surname);
-                p.setEmailPatient(email);
-                p.setDniPatient(dniClean);
-
-                try {
-                    p.setSexPatient(parseSex(sex));
-                } catch (IllegalArgumentException ex) {
-                    outputStream.writeUTF("ERROR");
-                    outputStream.writeUTF("Invalid sex value: " + ex.getMessage());
-                    outputStream.flush();
-                    return;
-                }
-
-                p.setPhoneNumberPatient(Integer.parseInt(phone));
-                p.setHealthInsuranceNumberPatient(Integer.parseInt(insurance));
-
                 // Parse fecha en formato dd-MM-yyyy
+                Date parsedDob = null;
                 try {
-                    Date parsedDob = new SimpleDateFormat("dd-MM-yyyy").parse(birthday);
-                    p.setDobPatient(parsedDob);
+                    java.util.Date utilDate = new SimpleDateFormat("dd-MM-yyyy").parse(birthday);
+                    parsedDob = new Date(utilDate.getTime());
                 } catch (ParseException pe) {
                     outputStream.writeUTF("ERROR");
                     outputStream.writeUTF("Invalid birthday format. Use dd-MM-yyyy (ej: 31-12-1990).");
                     outputStream.flush();
                     return;
                 }
+                Sex sexp = parseSex(sex);
+                int phonenumber = Integer.parseInt(phone);
+                int insuranceNumber = Integer.parseInt(insurance);
+                int emergencyContactnum = Integer.parseInt(emergencyContact);
 
-                p.setEmergencyContactPatient(Integer.parseInt(emergencyContact));
-
-
-                patientMan.addPatient(p);
+                Patient patient = new Patient(name, surname, dni, parsedDob, email, sexp, phonenumber, insuranceNumber, emergencyContactnum,  userId);
+                patientMan.addPatient(patient);
 
                 outputStream.writeUTF("ACK");
                 outputStream.writeUTF("Sign up successful. You can log in now.");
@@ -928,17 +912,18 @@ public class ServerThread {
                     return;
                 }
 
-                // Parsear DOB en formato dd-MM-yyyy y convertir a yyyy-MM-dd para la DB
-                String dobForDb;
+                // Parse fecha en formato dd-MM-yyyy
+                Date parsedDob = null;
                 try {
-                    Date parsed = new SimpleDateFormat("dd-MM-yyyy").parse(birthday);
-                    dobForDb = new SimpleDateFormat("yyyy-MM-dd").format(parsed);
+                    java.util.Date utilDate = new SimpleDateFormat("dd-MM-yyyy").parse(birthday);
+                    parsedDob = new Date(utilDate.getTime());
                 } catch (ParseException pe) {
                     outputStream.writeUTF("ERROR");
                     outputStream.writeUTF("Invalid birthday format. Use dd-MM-yyyy (ej: 31-12-1990).");
                     outputStream.flush();
                     return;
                 }
+                String dob = String.valueOf(parsedDob.getTime());
 
                 String encryptedPass = hashPassword(password);
 
@@ -983,7 +968,7 @@ public class ServerThread {
                             psDoc.setString(2, name);
                             psDoc.setString(3, surname);
                             psDoc.setString(4, dniClean);
-                            psDoc.setString(5, dobForDb); // usamos yyyy-MM-dd en la BDD
+                            psDoc.setString(5, dob); // usamos yyyy-MM-dd en la BDD
                             psDoc.setString(6, email);
                             psDoc.setString(7, sex);
                             psDoc.setString(8, specialty);

@@ -25,7 +25,7 @@ import java.util.List;
          this.conMan = conMan;
      }
 
-     @Override
+     /*@Override
      public void addPatient(Patient p) throws SQLException {
          String sql = "INSERT INTO patients(" +
                  "userId, namePatient, surnamePatient, dniPatient, dobPatient, emailPatient, " +
@@ -35,11 +35,8 @@ import java.util.List;
               PreparedStatement ps = c.prepareStatement(sql)) {
 
              Integer uid = p.getUserId();
-             if (uid == null || uid <= 0) {
-                 ps.setNull(1, java.sql.Types.INTEGER);
-             } else {
-                 ps.setInt(1, uid);
-             }
+             ps.setInt(1, uid);
+
 
              ps.setString(2, p.getNamePatient());
              ps.setString(3, p.getSurnamePatient());
@@ -70,7 +67,36 @@ import java.util.List;
 
              ps.executeUpdate();
          }
+     }*/
+
+     public void addPatient(Patient patient) throws SQLException {
+         String query = "INSERT INTO patients (userId, namePatient, surnamePatient, dniPatient, dobPatient, emailPatient, sexPatient, phoneNumberPatient, healthInsuranceNumberPatient, emergencyContactPatient) " +
+                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+
+         try (Connection c = conMan.getConnection();
+              PreparedStatement ps = c.prepareStatement(query)) {
+             ps.setInt(1, patient.getUserId());  // Set the userId for the patient
+             ps.setString(2, patient.getNamePatient());  // Set the name
+             ps.setString(3, patient.getSurnamePatient());  // Set the surname
+             ps.setString(4, patient.getDniPatient());  // Set the dni
+             ps.setDate(5, patient.getDobPatient());  // Set the date of birth
+             ps.setString(6, patient.getEmailPatient());  // Set the email
+             ps.setString(7, patient.getSexPatient().toString());  // Set the sex
+             ps.setInt(8, patient.getPhoneNumberPatient());  // Set the phone number
+             ps.setInt(9, patient.getHealthInsuranceNumberPatient());  // Set the insurance number
+             ps.setInt(10, patient.getEmergencyContactPatient());  // Set the emergency contact number
+
+             int rowsAffected = ps.executeUpdate();  // Execute the insert statement
+
+             if (rowsAffected == 0) {
+                 throw new SQLException("Inserting patient failed, no rows affected.");
+             }
+         } catch (SQLException e) {
+             e.printStackTrace();
+             throw new SQLException("Error inserting patient into the database: " + e.getMessage());
+         }
      }
+
 
      public void registerPatient(String username, String password, Patient p) throws SQLException {
          String userSql = "INSERT INTO users(username,password,role) VALUES(?,?, 'PATIENT')";
