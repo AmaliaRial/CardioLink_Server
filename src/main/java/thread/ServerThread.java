@@ -296,7 +296,6 @@ public class ServerThread {
                         System.out.println("Client disconnected (readUTF failed).");
                         break;
                     }
-
                     switch (command) {
                         case "SIGNUP":
                             handleSignup();
@@ -316,6 +315,29 @@ public class ServerThread {
                         case "DATA":
                             handleDataFrame();
                             break;
+
+                        case "GET_FRAGMENT_OF_RECORDING":
+                            String fragment = "";
+                            sendFragmentofRecording(fragment);
+                            break;
+
+                        case "OPEN_NEW_DIAGNOSIS_FILE":
+                            break;
+
+                        case "GET_FRAGMENT_STATES":
+                            int idDiagnosisFile = 0;
+                            SendStateOfFragmentsOfRecordingByID(idDiagnosisFile);
+                            break;
+
+                        case "GET_DIAGNOSIS_FILES":
+                            int idPatient = 0;
+                            sendAllDiagnosisFilesFromPatientToPatient(idPatient);
+                            break;
+
+                        case "SEND_NEW_DIAGNOSIS_FILE":
+                            break;
+
+
 
                         case "END":
 
@@ -819,6 +841,30 @@ public class ServerThread {
                             handleUpdateMedication();
                             break;
 
+                        case "LIST_RECENT_DIAGNOSIS_FILES":
+                            int idDoctor=0;
+                            SendDiagnosisFilesTODO(idDoctor);
+                            break;
+
+                        case "SEND_UPDATED_DIAGNOSIS_FILE":
+                            ReceiveUpdatedDiagnosisFile();
+                            break;
+
+                        case "GET_FRAGMENT_OF_RECORDING":
+                            String fragment = "";
+                            sendFragmentofRecording(fragment);
+                            break;
+
+                        case "GET_FRAGMENT_STATES":
+                            int idDiagnosisFile = 0;
+                            sendStateOfFragmentsOfRecordingByID(idDiagnosisFile);
+                            break;
+
+                        case "GET_DIAGNOSIS_FILES_BY_PATIENT_ID":
+                            int idPatient =0;
+                            sendAllDiagnosisFilesFromPatientToDoctor(idPatient);
+                            break;
+
                         case "LOGOUT":
                         case "EXIT":
                             loggedDoctorUserId = null;
@@ -1268,7 +1314,7 @@ public class ServerThread {
             }
         }
 
-        public DiagnosisFile ReciveAndUpdateDiagnosisFile() {
+        public DiagnosisFile ReceiveUpdatedDiagnosisFile() {
             DiagnosisFile updatedDiagnosisFile = null;
 
             try {
@@ -1414,7 +1460,7 @@ public class ServerThread {
             }
         }
 
-        public void SendStateOfFragmentsOfRecordingByID(int idDiagnosisFile) {
+        public void sendStateOfFragmentsOfRecordingByID(int idDiagnosisFile) {
             try {
                 DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream());
 
