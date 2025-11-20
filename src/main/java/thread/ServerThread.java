@@ -631,6 +631,111 @@ public class ServerThread {
                 }
             }
         }
+        public void sendFragmentofRecording(String fragment) {
+            DataOutputStream outputStream = null;
+
+            try {
+                outputStream = new DataOutputStream(socket.getOutputStream());
+
+                // 1) Parsear el String recibido: "idDiagnosisFile,position"
+                String[] parts = fragment.split(",");
+                if (parts.length != 2) {
+                    outputStream.writeBoolean(false);
+                    outputStream.writeUTF("Error: fragment format must be 'idDiagnosisFile,position'");
+                    outputStream.flush();
+                    return;
+                }
+
+                int idDiagnosisFile = Integer.parseInt(parts[0].trim());
+                int position = Integer.parseInt(parts[1].trim());
+
+                System.out.println("Request fragment -> idDiagnosisFile="
+                        + idDiagnosisFile + ", position=" + position);
+
+                // 2) Obtener el fragmento desde la BD
+                String fragmentData;
+                try {
+                    fragmentData = patientMan.getFracmentofRecoring(idDiagnosisFile, position);
+                } catch (SQLException e) {
+                    System.out.println("SQL error while retrieving recording fragment.");
+                    e.printStackTrace();
+                    outputStream.writeBoolean(false);
+                    outputStream.writeUTF("SQL error while retrieving fragment: " + e.getMessage());
+                    outputStream.flush();
+                    return;
+                }
+
+                // 3) Enviar la respuesta al cliente
+                if (fragmentData == null) {
+                    // Error interno o excepción capturada dentro de getFracmentofRecoring
+                    outputStream.writeBoolean(false);
+                    outputStream.writeUTF("Error retrieving fragment from the database.");
+                } else if ("No fragment found for the given DiagnosisFileId and position."
+                        .equals(fragmentData)) {
+                    // Caso en el que la consulta no devolvió filas
+                    outputStream.writeBoolean(false);
+                    outputStream.writeUTF(fragmentData);
+                } else {
+                    // Fragmento encontrado correctamente
+                    outputStream.writeBoolean(true);    // indica éxito
+                    outputStream.writeUTF(fragmentData); // aquí va el dato real (columna "data")
+                }
+
+                outputStream.flush();
+
+            } catch (IOException e) {
+                System.out.println("I/O error in sendFracmentofRecording.");
+                e.printStackTrace();
+            } catch (NumberFormatException e) {
+                System.out.println("Error parsing idDiagnosisFile or position from fragment string.");
+                e.printStackTrace();
+                try {
+                    if (outputStream != null) {
+                        outputStream.writeBoolean(false);
+                        outputStream.writeUTF("Error: unable to parse idDiagnosisFile or position.");
+                        outputStream.flush();
+                    }
+                } catch (IOException ignored) { }
+            }
+        }
+        public void SendStateOfFragmentsOfRecordingByID(int idDiagnosisFile) {
+            try {
+                DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream());
+
+                // 1. Obtener el estado de los fragmentos desde la base de datos
+                List<Boolean> statesList = patientMan.getSateOfFragmentsOfRecordingByID(idDiagnosisFile);
+
+                // 2. Verificar si hay estados disponibles
+                if (statesList.isEmpty()) {
+                    outputStream.writeUTF("No states found for this diagnosis file");
+                    outputStream.flush();
+                    return;
+                }
+
+                // 3. Crear un string con los estados "true,false,true,false"
+                StringBuilder statesStr = new StringBuilder();
+                for (Boolean b : statesList) {
+                    statesStr.append(b).append(",");
+                }
+
+                // Eliminar la última coma si existe
+                if (statesStr.length() > 0 && statesStr.charAt(statesStr.length() - 1) == ',') {
+                    statesStr.deleteCharAt(statesStr.length() - 1);
+                }
+
+                // 4. Enviar la respuesta al cliente
+                outputStream.writeUTF("StatesOfFragments");  // cabecera para indicar lo que estamos enviando
+                outputStream.writeInt(statesList.size());    // cuántos estados estamos enviando
+                outputStream.writeUTF(statesStr.toString()); // el string de estados
+
+                outputStream.flush();
+
+            } catch (SQLException | IOException e) {
+                System.out.println("Error while sending states of fragments");
+                e.printStackTrace();
+            }
+        }
+
 
         private String serializeToCSV(List<Integer> list) {
             return list.stream().map(Object::toString).collect(Collectors.joining(","));
@@ -1176,6 +1281,8 @@ public class ServerThread {
 
             } catch (IOException e) {
                 System.out.println("Error receiving and updating diagnosis file: " + e.getMessage());
+            } catch (SQLException e) {
+                throw new RuntimeException(e);
             }
 
             return updatedDiagnosisFile;
@@ -1230,9 +1337,115 @@ public class ServerThread {
             }
             return diagnosisFile;
         }
-        public void sendFragmentofRecording(){
 
+        public void sendFragmentofRecording(String fragment) {
+            DataOutputStream outputStream = null;
+
+            try {
+                outputStream = new DataOutputStream(socket.getOutputStream());
+
+                // 1) Parsear el String recibido: "idDiagnosisFile,position"
+                String[] parts = fragment.split(",");
+                if (parts.length != 2) {
+                    outputStream.writeBoolean(false);
+                    outputStream.writeUTF("Error: fragment format must be 'idDiagnosisFile,position'");
+                    outputStream.flush();
+                    return;
+                }
+
+                int idDiagnosisFile = Integer.parseInt(parts[0].trim());
+                int position = Integer.parseInt(parts[1].trim());
+
+                System.out.println("Request fragment -> idDiagnosisFile="
+                        + idDiagnosisFile + ", position=" + position);
+
+                // 2) Obtener el fragmento desde la BD usando el doctorManager
+                String fragmentData;
+                try {
+                    fragmentData = doctorMan.getFracmentofRecoring(idDiagnosisFile, position);
+                } catch (SQLException e) {
+                    System.out.println("SQL error while retrieving recording fragment.");
+                    e.printStackTrace();
+                    outputStream.writeBoolean(false);
+                    outputStream.writeUTF("SQL error while retrieving fragment: " + e.getMessage());
+                    outputStream.flush();
+                    return;
+                }
+
+                // 3) Enviar la respuesta al cliente
+                if (fragmentData == null) {
+                    // Error interno o excepción capturada dentro de getFracmentofRecoring
+                    outputStream.writeBoolean(false);
+                    outputStream.writeUTF("Error retrieving fragment from the database.");
+                } else if ("No fragment found for the given DiagnosisFileId and position."
+                        .equals(fragmentData)) {
+                    // Caso en el que la consulta no devolvió filas
+                    outputStream.writeBoolean(false);
+                    outputStream.writeUTF(fragmentData);
+                } else {
+                    // Fragmento encontrado correctamente
+                    outputStream.writeBoolean(true);    // indica éxito
+                    outputStream.writeUTF(fragmentData); // aquí va el dato real (columna "data")
+                }
+
+                outputStream.flush();
+
+            } catch (IOException e) {
+                System.out.println("I/O error in sendFracmentofRecording.");
+                e.printStackTrace();
+            } catch (NumberFormatException e) {
+                System.out.println("Error parsing idDiagnosisFile or position from fragment string.");
+                e.printStackTrace();
+                try {
+                    if (outputStream != null) {
+                        outputStream.writeBoolean(false);
+                        outputStream.writeUTF("Error: unable to parse idDiagnosisFile or position.");
+                        outputStream.flush();
+                    }
+                } catch (IOException ignored) { }
+            }
         }
+
+        public void SendStateOfFragmentsOfRecordingByID(int idDiagnosisFile) {
+            try {
+                DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream());
+
+                // 1. Obtener el estado de los fragmentos desde la base de datos
+                List<Boolean> statesList = doctorMan.getSateOfFragmentsOfRecordingByID(idDiagnosisFile);
+
+                // 2. Verificar si hay estados disponibles
+                if (statesList.isEmpty()) {
+                    outputStream.writeUTF("No states found for this diagnosis file");
+                    outputStream.flush();
+                    return;
+                }
+
+                // 3. Crear un string con los estados "true,false,true,false"
+                StringBuilder statesStr = new StringBuilder();
+                for (Boolean b : statesList) {
+                    statesStr.append(b).append(",");
+                }
+
+                // Eliminar la última coma si existe
+                if (statesStr.length() > 0 && statesStr.charAt(statesStr.length() - 1) == ',') {
+                    statesStr.deleteCharAt(statesStr.length() - 1);
+                }
+
+                // 4. Enviar la respuesta al cliente
+                outputStream.writeUTF("StatesOfFragments");  // cabecera para indicar lo que estamos enviando
+                outputStream.writeInt(statesList.size());    // cuántos estados estamos enviando
+                outputStream.writeUTF(statesStr.toString()); // el string de estados
+
+                outputStream.flush();
+
+            } catch (SQLException | IOException e) {
+                System.out.println("Error while sending states of fragments");
+                e.printStackTrace();
+            }
+        }
+
+
+
     }
 
 
