@@ -105,6 +105,25 @@ public class JDBCUserManager implements UserManager{
         }
     }
 
+    @Override
+    public void registerDoctor(String username, String encryptedPassword, String role) {
+        Role r;
+        try {
+            r = Role.valueOf(role.toUpperCase());
+        } catch (Exception ex) {
+            r = Role.DOCTOR;
+        }
+        String query = "INSERT INTO users (username, password, role) VALUES (?, ?, ?)";
+        try (Connection c = conMan.getConnection(); PreparedStatement ps = c.prepareStatement(query)) {
+            ps.setString(1, username);
+            ps.setString(2, encryptedPassword);
+            ps.setString(3, "DOCTOR");
+            ps.executeUpdate();
+        }catch (SQLException e) {
+            System.out.println("Error registering user: " + e.getMessage());
+        }
+    }
+
 
 /* NOW WE USE HASHING DONE WITH BCRYPT INSTEAD OF ENCRYPTION/DECRYPTION. THE METHODS ARE IN SERVER THREAD
     @Override

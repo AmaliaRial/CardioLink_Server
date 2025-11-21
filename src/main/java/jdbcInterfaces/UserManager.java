@@ -7,6 +7,7 @@ import java.sql.SQLException;
 public interface UserManager {
 
     void register(String username, String password, String role);
+    void registerDoctor(String username, String password, String role);
     //boolean verifyPassword(String username, String password);
     String getRole(String username);
     User getUserByCredentials(String username, String password) throws SQLException;

@@ -2,37 +2,75 @@ package pojos;
 
 import pojos.enums.Sex;
 import java.util.ArrayList;
-import java.util.Date;
+import java.sql.Date;
 import java.util.Objects;
 import java.util.List;
 
 public class Doctor {
     private int idDoctor;
+    private int userId;
     private String nameDoctor;
     private String surnameDoctor;
     private String dniDoctor;
     private Date dobDoctor;
     private String emailDoctor;
     private Sex sexDoctor;
-    private List<Patient> assignedPatients = new ArrayList<>();
-    private String usernameDoctor;
+    private String specialty;
+    private String licenseNumber;
 
-    public Doctor(int idDoc, String name, String surname, String dni, Date dob, String email, Sex sex, List<Patient> patients, String username) {
+
+
+    public Doctor(int idDoc, int userId, String name, String surname, String dni, Date dob, String email, Sex sex, String licenseNumber, String specialty) {
         this.idDoctor = idDoc;
+        this.userId = userId;
         this.nameDoctor = name;
         this.surnameDoctor = surname;
         this.dniDoctor = dni;
         this.dobDoctor = dob;
         this.emailDoctor = email;
         this.sexDoctor = sex;
-        this.assignedPatients = patients;
-        this.usernameDoctor = username;
+        this.specialty = specialty;
+        this.licenseNumber = licenseNumber;
+
+    }
+    public Doctor(int userId, String name, String surname, String dni, Date dob, String email, Sex sex, String licenseNumber, String specialty) {
+        this.userId = userId;
+        this.nameDoctor = name;
+        this.surnameDoctor = surname;
+        this.dniDoctor = dni;
+        this.dobDoctor = dob;
+        this.emailDoctor = email;
+        this.sexDoctor = sex;
+        this.specialty = specialty;
+        this.licenseNumber = licenseNumber;
+
     }
 
     public int getIdDoctor() {
         return idDoctor;}
     public void setIdDoctor(int idDoctor) {
         this.idDoctor = idDoctor;}
+
+    public int getUserId() {
+        return userId;
+    }
+    public void setUserId(int userId) {
+        this.userId = userId;
+    }
+
+    public String getLicenseNumber() {
+        return licenseNumber;
+    }
+    public void setLicenseNumber(String licenseNumber) {
+        this.licenseNumber = licenseNumber;
+    }
+    public String getSpecialty() {
+        return specialty;
+    }
+    public void setSpecialty(String specialty) {
+        this.specialty = specialty;
+    }
+
     public String getNameDoctor() {
         return nameDoctor;}
     public void setNameDoctor(String nameDoctor) {
@@ -57,14 +95,8 @@ public class Doctor {
         return sexDoctor;}
     public void setIdDoctor(Sex sexDoctor) {
         this.sexDoctor = sexDoctor;}
-    public List<Patient> getAssignedPatients() {
-        return assignedPatients;}
-    public void setAssignedPatients(List<Patient> assignedPatients) {
-        this.assignedPatients = assignedPatients;}
-    public String getUsernameDoctor() {
-        return usernameDoctor;}
-    public void set(String usernameDoctor){
-        this.usernameDoctor = usernameDoctor;}
+
+
 
     @Override
     public boolean equals(Object o) {
@@ -77,13 +109,13 @@ public class Doctor {
                 Objects.equals(dobDoctor, doctor.dobDoctor) &&
                 Objects.equals(emailDoctor, doctor.emailDoctor) &&
                 sexDoctor == doctor.sexDoctor &&
-                Objects.equals(assignedPatients, doctor.assignedPatients) &&
-                Objects.equals(usernameDoctor, doctor.usernameDoctor);
+                Objects.equals(specialty, doctor.specialty) &&
+                Objects.equals(licenseNumber, doctor.licenseNumber);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(idDoctor, nameDoctor, surnameDoctor, dniDoctor, dobDoctor, emailDoctor, sexDoctor, assignedPatients, usernameDoctor);
+        return Objects.hash(idDoctor, nameDoctor, surnameDoctor, dniDoctor, dobDoctor, emailDoctor, sexDoctor, specialty, licenseNumber);
     }
 
     @Override
@@ -96,8 +128,8 @@ public class Doctor {
                 ", dob=" + dobDoctor +
                 ", email='" + emailDoctor + '\'' +
                 ", sex=" + sexDoctor +
-                ", assigned Patients=" + assignedPatients +
-                ", username=" + usernameDoctor +
+                ", specialty=" + specialty +
+                ", licenseNumber='" + licenseNumber + '\'' +
                 '}';
     }
 

@@ -1,6 +1,7 @@
 package jdbc;
 
 import jdbcInterfaces.DoctorManager;
+import pojos.Doctor;
 import pojos.enums.Sex;
 import pojos.DiagnosisFile;
 import pojos.Patient;
@@ -29,7 +30,56 @@ public class JDBCDoctorManager implements DoctorManager {
             throw new RuntimeException(e);
         }
     }
-/**
+
+    @Override
+    public void addDoctor(Doctor d) throws  SQLException{
+        String query = "INSERT INTO doctors (userId, nameDoctor, surnameDoctor, dniDoctor, dobDoctor, emailDoctor, sexDoctor, specialty, licenseNumber) VALUES (?,?,?,?,?,?,?,?,?)";
+        try (PreparedStatement psDoc = c.prepareStatement(query)) {
+            psDoc.setInt(1, d.getUserId());          // userId obtenido al crear el user
+            psDoc.setString(2, d.getNameDoctor());
+            psDoc.setString(3, d.getSurnameDoctor());
+            psDoc.setString(4, d.getDniDoctor());
+            psDoc.setDate(5, d.getDobDoctor()); // usamos yyyy-MM-dd en la BDD
+            psDoc.setString(6, d.getEmailDoctor());
+            psDoc.setString(7, d.getSexDoctor().toString());
+            psDoc.setString(8, d.getSpecialty());
+            psDoc.setString(9, d. getLicenseNumber());
+
+            psDoc.executeUpdate();
+        }
+
+        c.commit();
+    }
+
+    @Override
+    public Doctor getDoctorbyUserId(int userId) throws SQLException{
+        String sql = "SELECT * FROM doctors WHERE userId = ?";
+        try (Connection c = conMan.getConnection();
+             PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setInt(1, userId);
+            ResultSet rs = ps.executeQuery();
+
+            if (rs.next()) {
+                String sexStr = rs.getString("sexDoctor");
+                Sex sexEnum = null;
+
+                if (sexStr != null) {
+                    try {
+                        if (sexStr.equalsIgnoreCase("MALE")) sexEnum = Sex.MALE;
+                        else if (sexStr.equalsIgnoreCase("FEMALE")) sexEnum = Sex.FEMALE;
+                        else sexEnum = Sex.valueOf(sexStr.toUpperCase());
+                    } catch (IllegalArgumentException e) {
+                        System.out.println(" Invalid sex value in DB: " + sexStr);
+                    }
+                }
+
+                Doctor d = new Doctor(rs.getInt("idDoctor"), rs.getInt("userId"), rs.getString("nameDoctor"), rs.getString("surnameDoctor"), rs.getString("dniDoctor"), rs.getDate("dobDoctor"), rs.getString("emailDoctor"), sexEnum, rs.getString("specialty"), rs.getString("licenseNumber") );
+                return d;
+            }
+            return null;
+        }
+    }
+/*
     @Override
     public List <DiagnosisFile> listRecentlyFinishedFiles(){
         List<DiagnosisFile> recentFiles = new ArrayList<>();
@@ -61,7 +111,7 @@ public class JDBCDoctorManager implements DoctorManager {
         return recentFiles;
     }*/
 
-    /**
+    /*
     @Override
     public List <DiagnosisFile> listAllFinishedFiles(){
         List<DiagnosisFile> recentFiles = new ArrayList<>();
@@ -125,7 +175,7 @@ public class JDBCDoctorManager implements DoctorManager {
     }
 
 
-    /**
+    /*
     public List<DiagnosisFile> getDiagnosisFilesByPatientId(int patientId) {
         List<DiagnosisFile> diagnosisFiles = new ArrayList<>();
         try {
@@ -233,7 +283,7 @@ public class JDBCDoctorManager implements DoctorManager {
         }
     }
 
-/**
+/*
     @Override
     public void deleteDiagnosisFile(int  id) {
         try {
