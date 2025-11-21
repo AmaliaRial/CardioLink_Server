@@ -1,10 +1,9 @@
 package thread;
 
 import jdbc.*;
-import pojos.DiagnosisFile;
-import pojos.Patient;
-import pojos.User;
+import pojos.*;
 
+import java.awt.*;
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -15,6 +14,7 @@ import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.sql.Date;
+import java.util.Arrays;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -836,7 +836,7 @@ public class ServerThread {
 
                         case "GET_FRAGMENT_OF_RECORDING":
                             String fragment = "";
-                            sendFragmentofRecording(fragment);
+                            //sendFragmentofRecording(fragment);
                             break;
 
                         case "GET_FRAGMENT_STATES":
@@ -1377,23 +1377,27 @@ public class ServerThread {
             return diagnosisFile;
         }
 
-        public void sendFragmentofRecording(String fragment) {
+        //to use: int idDiagnosisFile = address[0];
+        //        int position =address[1];
+        public Integer[] slipFragmentAddress(String fragmentAddress) throws IOException {
+            String[] parts = fragmentAddress.split(",");
+            Integer[] address = new Integer[parts.length];
+            if (parts.length != 2) {
+                outputStream.writeBoolean(false);
+                outputStream.writeUTF("Error: fragment format must be 'idDiagnosisFile,position'");
+                outputStream.flush();
+            }
+            address[0] = Integer.parseInt(parts[0].trim());
+            address[1] = Integer.parseInt(parts[1].trim());
+
+            return address;
+        }
+
+        public void sendFragmentofRecording(int idDiagnosisFile, int position) {
             DataOutputStream outputStream = null;
 
             try {
                 outputStream = new DataOutputStream(socket.getOutputStream());
-
-                // 1) Parsear el String recibido: "idDiagnosisFile,position"
-                String[] parts = fragment.split(",");
-                if (parts.length != 2) {
-                    outputStream.writeBoolean(false);
-                    outputStream.writeUTF("Error: fragment format must be 'idDiagnosisFile,position'");
-                    outputStream.flush();
-                    return;
-                }
-
-                int idDiagnosisFile = Integer.parseInt(parts[0].trim());
-                int position = Integer.parseInt(parts[1].trim());
 
                 System.out.println("Request fragment -> idDiagnosisFile="
                         + idDiagnosisFile + ", position=" + position);
@@ -1445,6 +1449,25 @@ public class ServerThread {
             }
         }
 
+        public String receivedFragmentAddress() {
+            String fragmentAddress = null;
+            try {
+                // Esperamos a recibir el mensaje del paciente (la dirección del fragmento)
+                InputStream inputStream = socket.getInputStream();
+                ObjectInputStream objectInputStream = new ObjectInputStream(inputStream);
+
+                // Recibimos la dirección del fragmento como String
+                fragmentAddress = (String) objectInputStream.readObject();
+
+                // Aquí puedes agregar cualquier lógica adicional si es necesario
+            } catch (IOException | ClassNotFoundException e) {
+                // Manejo de errores
+                System.err.println("Error al recibir la dirección del fragmento: " + e.getMessage());
+            }
+            return fragmentAddress;
+        }
+
+
         public void sendStateOfFragmentsOfRecordingByID(int idDiagnosisFile) {
             try {
                 DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream());
@@ -1482,8 +1505,6 @@ public class ServerThread {
                 e.printStackTrace();
             }
         }
-
-
 
     }
 
