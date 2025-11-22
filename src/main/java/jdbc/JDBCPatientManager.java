@@ -252,7 +252,7 @@ import java.util.List;
      }
 
      @Override
-     public String getFracmentofRecoring(int idDiagnosisFile, int position)throws SQLException {
+     public String getFragmentOfRecording(int idDiagnosisFile, int position)throws SQLException {
          String sql = "SELECT data FROM recordings WHERE diagnosisFileId = ? AND sequence = ?";
 
          try (Connection c = conMan.getConnection();  // Assuming conMan.getConnection() returns a valid DB connection

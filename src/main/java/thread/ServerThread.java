@@ -1,9 +1,10 @@
 package thread;
 
 import jdbc.*;
-import pojos.*;
+import pojos.DiagnosisFile;
+import pojos.Patient;
+import pojos.User;
 
-import java.awt.*;
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -14,7 +15,6 @@ import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.sql.Date;
-import java.util.Arrays;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -255,6 +255,8 @@ public class ServerThread {
 
     // SERVER PATIENT THREAD
     private static class ServerPatientThread implements Runnable {
+        private static final Logger LOGGER = Logger.getLogger(ServerThread.class.getName());
+
         private final Socket socket;
         private final DataInputStream inputStream;
         private final DataOutputStream outputStream;
@@ -268,6 +270,16 @@ public class ServerThread {
         private final List<Integer> EDA = new ArrayList<>();
         private ArrayList<String> currentSymptoms = new ArrayList<>();
         private Patient loggedPatient = null;
+
+        // STATE MACHINE
+        private enum State {
+            AUTH,               // SIGNUP / LOGIN / QUIT
+            MAIN_MENU,          // START / VIEW_PATIENT / LOG_OUT / QUIT
+            VIEW_PATIENT,       // VIEW_DIAGNOSIS_FILE / BACK_TO_MENU
+            VIEW_DIAGNOSIS_FILE,// VIEW_RECORDING / BACK_TO_PATIENT
+            VIEW_RECORDING      // CHANGE_FRAGMENT / DOWNLOAD_RECORDING / BACK_TO_DIAGNOSIS_FILE
+        }
+        private State state = State.AUTH;
 
         private ServerPatientThread(Socket socket, DataInputStream inputStream, DataOutputStream outputStream, JDBCDoctorManager doctorMan, JDBCPatientManager patientMan, ConnectionManager conMan, JDBCUserManager userMan) {
             this.socket = socket;
@@ -283,100 +295,224 @@ public class ServerThread {
         @Override
         public void run() {
 
-            ArrayList<Integer> ECG = new ArrayList<>();
-            ArrayList<Integer> EDA = new ArrayList<>();
-            String loggedUsername = null;
             try {
-                // Main loop: read commands (UTF strings) from client
-                while (!socket.isClosed()) {
-                    String command;
-                    try {
-                        command = inputStream.readUTF();
-                    } catch (IOException e) {
-                        System.out.println("Client disconnected (readUTF failed).");
+                boolean running = true;
+
+                while (running && !socket.isClosed()) {
+
+                    String command = readCommand();
+                    if (command == null) { // client disconnected
                         break;
                     }
-                    switch (command) {
-                        case "SIGNUP":
-                            handleSignup();
+
+                    // Normalize command (you can also support arguments here)
+                    command = command.trim();
+                    if (command.isEmpty()) {
+                        continue;
+                    }
+
+                    switch (state) {
+                        case AUTH:
+                            running = handleAuthCommand(command);
                             break;
 
-                        case "LOGIN":
-                            handleLogin();
+                        case MAIN_MENU:
+                            running = handleMainMenuCommand(command);
                             break;
 
-                        case "START":
-                            // client starting recording - we can ACK
-                            outputStream.writeUTF("ACK");
-                            outputStream.writeUTF("Ready to receive data");
-                            outputStream.flush();
+                        case VIEW_PATIENT:
+                            running = handleViewPatientCommand(command);
                             break;
 
-                        case "DATA":
-                            handleDataFrame();
+                        case VIEW_DIAGNOSIS_FILE:
+                            running = handleDiagnosisFileCommand(command);
                             break;
 
-                        case "GET_FRAGMENT_OF_RECORDING":
-                            String fragment = "";
-                            sendFragmentofRecording(fragment);
-                            break;
-
-                        case "OPEN_NEW_DIAGNOSIS_FILE":
-                            break;
-
-                        case "GET_FRAGMENT_STATES":
-                            int idDiagnosisFile = 0;
-                            SendStateOfFragmentsOfRecordingByID(idDiagnosisFile);
-                            break;
-
-                        case "GET_DIAGNOSIS_FILES":
-                            int idPatient = 0;
-                            sendAllDiagnosisFilesFromPatientToPatient(idPatient);
-                            break;
-
-                        case "SEND_NEW_DIAGNOSIS_FILE":
-                            break;
-
-
-
-                        case "END":
-
-                            //handleEndOfRecording();
-
-                            // Clear arrays to prepare for next recording
-                            ECG.clear();
-                            EDA.clear();
-                            break;
-                        /** NOT NEEDED TO HANDLE ANY MORE (symptoms is not a class)
-                         case "SYMPTOMS":
-                         handleSymptoms();
-                         break;
-                         */
-
-                        case "ERROR":
-                            // Client informs of an error
-                            String errMsg = inputStream.readUTF();
-                            System.err.println("Client reported error: " + errMsg);
+                        case VIEW_RECORDING:
+                            running = handleRecordingCommand(command);
                             break;
 
                         default:
-                            // Unknown command
-                            System.out.println("Received unknown command: " + command);
-                            outputStream.writeUTF("ERROR");
-                            outputStream.writeUTF("Unknown command: " + command);
-                            outputStream.flush();
+                            // Should never happen
+                            outputStream.writeUTF("ERROR Internal server state");
+                            running = false;
                             break;
-                    } // end switch
-                } // end while
+                    }
+                }
+
             } catch (IOException | ParseException ex) {
-                Logger.getLogger(ServerThread.class.getName()).log(Level.SEVERE, null, ex);
+                LOGGER.log(Level.SEVERE, "Server thread error", ex);
             } catch (Exception e) {
-                throw new RuntimeException(e);
+                // Last-resort catch, avoid killing the server because of one client
+                LOGGER.log(Level.SEVERE, "Unexpected error in client handler", e);
             } finally {
                 System.out.println("Client disconnected");
                 releaseResourcesPatient(inputStream, socket, outputStream);
             }
         }
+
+        /**
+         * Centralized method to read a command from the client.
+         * Returns null if the client disconnects or read fails.
+         */
+        private String readCommand() {
+            try {
+                return inputStream.readUTF();
+            } catch (IOException e) {
+                System.out.println("Client disconnected (readUTF failed).");
+                return null;
+            }
+        }
+
+        /* ============================ STATE HANDLERS ============================ */
+
+        /**
+         * AUTH state: expects SIGNUP / LOGIN / QUIT
+         */
+        private boolean handleAuthCommand(String command) throws Exception {
+            switch (command) {
+                case "SIGNUP":
+                    handleSignup(); // you implement this
+                    return true;   // keep connection open
+
+                case "LOGIN":
+                    handleLogin(); // implement to return Patient or null
+                    if (loggedPatient != null) {
+                        // Login OK: go to main menu
+                        state = State.MAIN_MENU;
+                        outputStream.writeUTF("LOGIN_OK");
+                    } else {
+                        // Login failed
+                        outputStream.writeUTF("LOGIN_FAILED");
+                    }
+                    return true;
+
+                case "QUIT":
+                    // Client wants to close connection
+                    outputStream.writeUTF("BYE");
+                    return false; // stop main loop
+
+                default:
+                    outputStream.writeUTF("ERROR Unknown command in AUTH state");
+                    return true;
+            }
+        }
+
+        /**
+         * MAIN_MENU state: START / VIEW_PATIENT / LOG_OUT / QUIT
+         */
+        private boolean handleMainMenuCommand(String command) throws IOException {
+            switch (command) {
+                case "START":
+                    // Example: start a new measurement session, etc
+                    handleStart();
+                    return true;
+
+                case "VIEW_PATIENT":
+                    // Optionally send patient info here
+                    handleViewPatientOverview();
+                    state = State.VIEW_PATIENT;
+                    return true;
+
+                case "LOG_OUT":
+                    loggedPatient = null;
+                    state = State.AUTH;
+                    outputStream.writeUTF("LOGGED_OUT");
+                    return true;
+
+                case "QUIT":
+                    outputStream.writeUTF("BYE");
+                    return false;
+
+                default:
+                    outputStream.writeUTF("ERROR Unknown command in MAIN_MENU state");
+                    return true;
+            }
+        }
+
+        /**
+         * VIEW_PATIENT state: VIEW_DIAGNOSIS_FILE / BACK_TO_MENU
+         */
+        private boolean handleViewPatientCommand(String command) throws IOException {
+            switch (command) {
+                case "VIEW_DIAGNOSIS_FILE":
+                    // You probably want some selection logic:
+                    // handleViewDiagnosisFileList(loggedPatient.getIdPatient());
+                    handleViewDiagnosisFileList();
+                    state = State.VIEW_DIAGNOSIS_FILE;
+                    return true;
+
+                case "BACK_TO_MENU":
+                    state = State.MAIN_MENU;
+                    return true;
+
+                case "QUIT":
+                    outputStream.writeUTF("BYE");
+                    return false;
+
+                default:
+                    outputStream.writeUTF("ERROR Unknown command in VIEW_PATIENT state");
+                    return true;
+            }
+        }
+
+        /**
+         * VIEW_DIAGNOSIS_FILE state: VIEW_RECORDING / BACK_TO_PATIENT
+         */
+        private boolean handleDiagnosisFileCommand(String command) throws IOException {
+            switch (command) {
+                case "VIEW_RECORDING":
+                    // handleViewRecordingList(selectedDiagnosisFileId);
+                    handleViewRecordingList();
+                    state = State.VIEW_RECORDING;
+                    return true;
+
+                case "BACK_TO_PATIENT":
+                    state = State.VIEW_PATIENT;
+                    return true;
+
+                case "QUIT":
+                    outputStream.writeUTF("BYE");
+                    return false;
+
+                default:
+                    outputStream.writeUTF("ERROR Unknown command in VIEW_DIAGNOSIS_FILE state");
+                    return true;
+            }
+        }
+
+        /**
+         * VIEW_RECORDING state: CHANGE_FRAGMENT / DOWNLOAD_RECORDING / BACK_TO_DIAGNOSIS_FILE
+         */
+        private boolean handleRecordingCommand(String command) throws IOException {
+            switch (command) {
+                case "CHANGE_FRAGMENT":
+                    // handleChangeFragment(selectedRecordingId, nextFragmentIndex);
+                    handleChangeFragment();
+                    return true;
+
+                case "DOWNLOAD_RECORDING":
+                    // handleDownloadRecording(selectedRecordingId);
+                    handleDownloadRecording();
+                    return true;
+
+                case "BACK_TO_DIAGNOSIS_FILE":
+                    state = State.VIEW_DIAGNOSIS_FILE;
+                    return true;
+
+                case "QUIT":
+                    outputStream.writeUTF("BYE");
+                    return false;
+
+                default:
+                    outputStream.writeUTF("ERROR Unknown command in VIEW_RECORDING state");
+                    return true;
+            }
+        }
+
+        /* ============================ BUSINESS LOGIC STUBS ============================ */
+
+        // Adapt these methods to your existing code
 
         private void handleSignup() throws Exception {
             // Read payload in same order sent by client
@@ -440,6 +576,7 @@ public class ServerThread {
 
                 Patient patient = new Patient(name, surname, dni, parsedDob, email, sexp, phonenumber, insuranceNumber, emergencyContactnum,  userId);
                 patientMan.addPatient(patient);
+                this.loggedPatient=patient;
 
                 outputStream.writeUTF("ACK");
                 outputStream.writeUTF("Sign up successful. You can log in now.");
@@ -451,28 +588,9 @@ public class ServerThread {
             }
         }
 
-        private Sex parseSex(String sexStr) {
-            if (sexStr == null) {
-                throw new IllegalArgumentException("Sex value is null");
-            }
-            String s = sexStr.toUpperCase();
-
-            // Map common cases
-            if (s.equals("M") || s.equals("MALE") || s.equals("MAN") || s.equals("H") || s.equals("HOMBRE")) {
-                return Sex.MALE;
-            }
-            if (s.equals("F") || s.equals("FEMALE") || s.equals("W") || s.equals("WOMAN") || s.equals("MUJER")) {
-                return Sex.FEMALE;
-            }
-
-            // Try direct enum name (in case client already sends MALE/FEMALE or other valid names)
-            try {
-                return Sex.valueOf(s);
-            } catch (IllegalArgumentException ex) {
-                throw new IllegalArgumentException("Valor de sexo no reconocido: " + sexStr);
-            }
-        }
-
+        /**
+         * Login should return a Patient (or User) object on success, null on failure.
+         */
         private void handleLogin() throws IOException {
 
             try {
@@ -504,6 +622,86 @@ public class ServerThread {
             }
         }
 
+        private void handleStart() throws IOException {
+            // Here you can start ECG/EDA acquisition, etc.
+            // Use ECG and EDA lists if needed.
+            outputStream.writeUTF("START_OK");
+        }
+
+        private void handleViewPatientOverview() throws IOException {
+            // Send basic info about loggedPatient to client
+            if (loggedPatient != null) {
+                outputStream.writeUTF("PATIENT_INFO " + loggedPatient.getNamePatient());
+            } else {
+                outputStream.writeUTF("ERROR No patient logged in");
+            }
+        }
+
+        private void handleViewDiagnosisFileList() throws IOException {
+            // Query diagnosis files for loggedPatient and send them to client
+            outputStream.writeUTF("DIAGNOSIS_FILE_LIST ...");
+        }
+
+        private void handleViewRecordingList() throws IOException {
+            // Query recordings for selected diagnosis file and send to client
+            outputStream.writeUTF("RECORDING_LIST ...");
+        }
+
+        private void handleChangeFragment() throws IOException {
+            // Read fragment index from client, send fragment data, etc.
+            // Example:
+            // int fragmentIndex = inputStream.readInt();
+            // send fragment for given recording
+            outputStream.writeUTF("FRAGMENT_CHANGED");
+        }
+
+        private void handleDownloadRecording() throws IOException {
+            // Send full recording to client (e.g. as binary or chunked)
+            outputStream.writeUTF("DOWNLOAD_STARTED");
+            // ... stream data ...
+            outputStream.writeUTF("DOWNLOAD_FINISHED");
+        }
+
+        /* ============================ RESOURCE CLEANUP ============================ */
+
+        private void releaseResourcesPatient(DataInputStream in,
+                                             Socket socket,
+                                             DataOutputStream out) {
+            // Your existing cleanup implementation
+            try {
+                if (in != null) in.close();
+            } catch (IOException ignored) { }
+            try {
+                if (out != null) out.close();
+            } catch (IOException ignored) { }
+            try {
+                if (socket != null && !socket.isClosed()) socket.close();
+            } catch (IOException ignored) { }
+        }
+
+        private Sex parseSex(String sexStr) {
+            if (sexStr == null) {
+                throw new IllegalArgumentException("Sex value is null");
+            }
+            String s = sexStr.toUpperCase();
+
+            // Map common cases
+            if (s.equals("M") || s.equals("MALE") || s.equals("MAN") || s.equals("H") || s.equals("HOMBRE")) {
+                return Sex.MALE;
+            }
+            if (s.equals("F") || s.equals("FEMALE") || s.equals("W") || s.equals("WOMAN") || s.equals("MUJER")) {
+                return Sex.FEMALE;
+            }
+
+            // Try direct enum name (in case client already sends MALE/FEMALE or other valid names)
+            try {
+                return Sex.valueOf(s);
+            } catch (IllegalArgumentException ex) {
+                throw new IllegalArgumentException("Valor de sexo no reconocido: " + sexStr);
+            }
+        }
+
+
         private void handleDataFrame() {
             try {
                 int blockNumber = inputStream.readInt();
@@ -518,7 +716,6 @@ public class ServerThread {
             }
         }
 
-        /*
         private void handleEndOfRecording() throws IOException {
             outputStream.writeUTF("ACK");
             outputStream.writeUTF("Recording finished. Saving data...");
@@ -541,6 +738,7 @@ public class ServerThread {
                 diag.setDiagnosis("Pending"); // default, doctor modifies later
                 diag.setMedication("Pending");
 
+                saveDiagnosisFile(diag);
 
                 outputStream.writeUTF("ACK");
                 outputStream.writeUTF("Data saved successfully in diagnosisFile.");
@@ -555,9 +753,47 @@ public class ServerThread {
             }
         }
 
+        /**
+         * THIS IS NOT NEEDED SINCE ITS NOT A CLASS ANY MORE
+         * private void handleSymptoms() throws IOException {
+         * int count = inputStream.readInt();
+         * currentSymptoms = new ArrayList<>();
+         * for (int i = 0; i < count; i++) {
+         * int id = inputStream.readInt();
+         * if (id > 0) {
+         * currentSymptoms.add(new Symptoms(id));
+         * }
+         * }
+         * String timestamp = inputStream.readUTF();
+         * System.out.printf("Received symptoms %s at %s%n", currentSymptoms, timestamp);
+         * <p>
+         * outputStream.writeUTF("ACK");
+         * outputStream.writeUTF("Symptoms received.");
+         * outputStream.flush();
+         * }
          */
 
+        private void saveDiagnosisFile(DiagnosisFile file) throws SQLException {
+            // Use JDBCDoctorManager to insert a new record
+            try (var c = conMan.getConnection();
+                 var ps = c.prepareStatement(
+                         "INSERT INTO diagnosisFile (symptoms, diagnosis, medication, date, patientId, sensorDataECG, sensorDataEDA) VALUES (?,?,?,?,?,?,?)")) {
 
+                String symptomsSerialized = file.getSymptoms() == null ? "" :
+                        file.getSymptoms().stream()
+                                //.map(Symptoms::getNameSymptom) NOT A CLASS GET NAME DIRECT FROM STRING
+                                .collect(Collectors.joining(", "));
+
+                ps.setString(1, symptomsSerialized);
+                ps.setString(2, file.getDiagnosis());
+                ps.setString(3, file.getMedication());
+                ps.setDate(4, java.sql.Date.valueOf(file.getDate()));
+                ps.setInt(5, file.getPatientId());
+                //ps.setString(6, file.getSensorDataECG());
+                //ps.setString(7, file.getSensorDataEDA());
+                ps.executeUpdate();
+            }
+        }
 
         public void sendAllDiagnosisFilesFromPatientToPatient(int idPatient) {
             DataOutputStream outputStream = null;
@@ -630,7 +866,7 @@ public class ServerThread {
                 // 2) Obtener el fragmento desde la BD
                 String fragmentData;
                 try {
-                    fragmentData = patientMan.getFracmentofRecoring(idDiagnosisFile, position);
+                    fragmentData = patientMan.getFragmentOfRecording(idDiagnosisFile, position);
                 } catch (SQLException e) {
                     System.out.println("SQL error while retrieving recording fragment.");
                     e.printStackTrace();
@@ -731,7 +967,6 @@ public class ServerThread {
         // Estado de sesión del doctor (null si no autenticado)
         private Integer loggedDoctorUserId = null;
         private Integer loggedDoctorId = null;
-        private Doctor loggedDoctor = null;
 
         // Firma unificada con ServerPatientThread
         private ServerDoctorThread(Socket socket,
@@ -799,7 +1034,7 @@ public class ServerThread {
 
                         case "GET_FRAGMENT_OF_RECORDING":
                             String fragment = "";
-                            //sendFragmentofRecording(fragment);
+                            sendFragmentofRecording(fragment);
                             break;
 
                         case "GET_FRAGMENT_STATES":
@@ -843,64 +1078,135 @@ public class ServerThread {
 
 
         private void handleSignupDoctor() throws IOException {
-
-            String username = inputStream.readUTF();
-            String password = inputStream.readUTF();
-            String name = inputStream.readUTF();
-            String surname = inputStream.readUTF();
-            String birthday = inputStream.readUTF(); // "dd-MM-yyyy"
-            String sex = inputStream.readUTF();
-            String email = inputStream.readUTF();
-            String specialty = inputStream.readUTF();
-            String licenseNumber = inputStream.readUTF();
-            String dni = inputStream.readUTF();
-
-            // Sanitize y validar DNI
-            String dniClean = dni == null ? "" : dni.replaceAll("[^0-9A-Za-z]", "").toUpperCase();
-            if (!dniClean.matches("\\d{8}[A-Z]") && !dniClean.matches("[XYZ]\\d{7}[A-Z]")) {
-                outputStream.writeUTF("ERROR");
-                outputStream.writeUTF(
-                        "Invalid DNI/NIE format. Expected 8 dígitos + letra (12345678A) " +
-                                "o NIE tipo X1234567L."
-                );
-                outputStream.flush();
-                return;
-            }
-
-
-            if (!email.matches("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+$")) {
-                outputStream.writeUTF("ERROR");
-                outputStream.writeUTF("Invalid email format.");
-                outputStream.flush();
-                return;
-            }
-
-
-            String encryptedPass = hashPassword(password);
             try {
-                userMan.registerDoctor(username, encryptedPass, "DOCTOR");
-                int userId = userMan.getUserId(username);
+                String username = inputStream.readUTF();
+                String password = inputStream.readUTF();
+                String name = inputStream.readUTF();
+                String surname = inputStream.readUTF();
+                String birthday = inputStream.readUTF(); // "dd-MM-yyyy"
+                String sex = inputStream.readUTF();
+                String email = inputStream.readUTF();
+                String specialty = inputStream.readUTF();
+                String licenseNumber = inputStream.readUTF();
+                String dni = inputStream.readUTF();
 
+                // Sanitize y validar DNI
+                String dniClean = dni == null ? "" : dni.replaceAll("[^0-9A-Za-z]", "").toUpperCase();
+                if (!dniClean.matches("\\d{8}[A-Z]") && !dniClean.matches("[XYZ]\\d{7}[A-Z]")) {
+                    outputStream.writeUTF("ERROR");
+                    outputStream.writeUTF(
+                            "Invalid DNI/NIE format. Expected 8 dígitos + letra (12345678A) " +
+                                    "o NIE tipo X1234567L."
+                    );
+                    outputStream.flush();
+                    return;
+                }
+
+
+                if (!email.matches("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+$")) {
+                    outputStream.writeUTF("ERROR");
+                    outputStream.writeUTF("Invalid email format.");
+                    outputStream.flush();
+                    return;
+                }
+
+                // Parse fecha en formato dd-MM-yyyy
                 Date parsedDob = null;
                 try {
                     java.util.Date utilDate = new SimpleDateFormat("dd-MM-yyyy").parse(birthday);
                     parsedDob = new Date(utilDate.getTime());
                 } catch (ParseException pe) {
                     outputStream.writeUTF("ERROR");
-                    outputStream.writeUTF("Invalid dob format.");
+                    outputStream.writeUTF("Invalid birthday format. Use dd-MM-yyyy (ej: 31-12-1990).");
                     outputStream.flush();
                     return;
                 }
-                Sex sex1 = parseSex(sex);
-                Doctor doctor = new Doctor(userId, name, surname, dniClean, parsedDob, email, sex1, licenseNumber, specialty);
-                doctorMan.addDoctor(doctor);
+                String dob = String.valueOf(parsedDob.getTime());
 
-                outputStream.writeUTF("ACK");
-                outputStream.writeUTF("Sign up successful. You can log in now.");
-                outputStream.flush();
-            } catch (Exception e) {
+                String encryptedPass = hashPassword(password);
+
+                try (var c = conMan.getConnection()) {
+                    c.setAutoCommit(false);
+                    try {
+
+                        int newUserId;
+                        try (var psUser = c.prepareStatement(
+                                "INSERT INTO users (username, password, role) VALUES (?,?,?)",
+                                Statement.RETURN_GENERATED_KEYS)) {
+                            psUser.setString(1, username);
+                            psUser.setString(2, encryptedPass);
+                            psUser.setString(3, "DOCTOR");
+                            psUser.executeUpdate();
+                            try (var keys = psUser.getGeneratedKeys()) {
+                                if (!keys.next()) {
+                                    throw new SQLException("No user id generated");
+                                }
+                                newUserId = keys.getInt(1);
+                            }
+                        }
+
+                        //
+                        try (var check = c.prepareStatement("SELECT idDoctor FROM doctors WHERE userId = ?")) {
+                            check.setInt(1, newUserId);
+                            try (var rs = check.executeQuery()) {
+                                if (rs.next()) {
+                                    c.rollback();
+                                    outputStream.writeUTF("ERROR");
+                                    outputStream.writeUTF("Doctor already registered for this user.");
+                                    outputStream.flush();
+                                    return;
+                                }
+                            }
+                        }
+
+                        //
+                        try (PreparedStatement psDoc = c.prepareStatement(
+                                "INSERT INTO doctors (userId, nameDoctor, surnameDoctor, dniDoctor, dobDoctor, emailDoctor, sexDoctor, specialty, licenseNumber) VALUES (?,?,?,?,?,?,?,?,?)")) {
+                            psDoc.setInt(1, newUserId);          // userId obtenido al crear el user
+                            psDoc.setString(2, name);
+                            psDoc.setString(3, surname);
+                            psDoc.setString(4, dniClean);
+                            psDoc.setString(5, dob); // usamos yyyy-MM-dd en la BDD
+                            psDoc.setString(6, email);
+                            psDoc.setString(7, sex);
+                            psDoc.setString(8, specialty);
+                            psDoc.setString(9, licenseNumber);
+
+                            System.out.println("Insertando doctor: userId=" + newUserId + " dni=" + dniClean + " email=" + email);
+
+                            psDoc.executeUpdate();
+                        }
+
+                        c.commit();
+                        outputStream.writeUTF("ACK");
+                        outputStream.writeUTF("Doctor sign up successful. You can log in now.");
+                        outputStream.flush();
+                        return;
+                    } catch (SQLException ex) {
+                        try {
+                            c.rollback();
+                        } catch (SQLException ignore) {
+                        }
+                        String msg = ex.getMessage() != null ? ex.getMessage() : ex.toString();
+                        if (msg.contains("UNIQUE") || msg.contains("constraint failed")) {
+                            outputStream.writeUTF("ERROR");
+                            outputStream.writeUTF("User or doctor already exists (unique constraint).");
+                        } else {
+                            outputStream.writeUTF("ERROR");
+                            outputStream.writeUTF("Sign up DB error: " + msg);
+                        }
+                        outputStream.flush();
+                        return;
+                    } finally {
+                        try {
+                            c.setAutoCommit(true);
+                        } catch (SQLException ignore) {
+                        }
+                    }
+                }
+            } catch (Exception ex) {
                 outputStream.writeUTF("ERROR");
-                outputStream.writeUTF("Sign up failed: " + e.getMessage());
+                outputStream.writeUTF("Sign up failed: " + ex.getMessage());
                 outputStream.flush();
             }
         }
@@ -913,16 +1219,41 @@ public class ServerThread {
                 String storedpw = userMan.getPassword(username);
                 boolean logged = checkPassword(password, storedpw);
 
-                if(logged){
-                    User u = userMan.getUserByUsername(username);
-                    int userId = u.getIdUser();
-                    loggedDoctor = doctorMan.getDoctorbyUserId(userId);
-                    outputStream.writeUTF("LOGIN_RESULT");
-                    outputStream.writeBoolean(true);
-                    outputStream.writeUTF("Loggin successful. Welcome doctor" + loggedDoctor.getSurnameDoctor() + ".");
-                }else{
+                outputStream.writeUTF("LOGIN_RESULT");
+
+                if (!logged) {
                     outputStream.writeBoolean(false);
-                    outputStream.writeUTF("Invalid username or password");
+                    outputStream.writeUTF("Invalid username or password.");
+                    outputStream.flush();
+                    return;
+                }
+
+                User u = userMan.getUserByUsername(username);
+                if (u == null || u.getRole() == null || !u.getRole().equalsIgnoreCase("DOCTOR")) {
+                    outputStream.writeBoolean(false);
+                    outputStream.writeUTF("User is not a doctor.");
+                    outputStream.flush();
+                    return;
+                }
+
+                try (var c = conMan.getConnection();
+                     var ps = c.prepareStatement("SELECT idDoctor FROM doctors WHERE userId = ?")) {
+                    ps.setInt(1, u.getIdUser());
+                    try (var rs = ps.executeQuery()) {
+                        if (rs.next()) {
+                            loggedDoctorUserId = u.getIdUser();
+                            loggedDoctorId = rs.getInt("idDoctor");
+                            outputStream.writeBoolean(true);
+                            outputStream.writeUTF("Login successful. Welcome doctor " + username);
+                        } else {
+                            outputStream.writeBoolean(false);
+                            outputStream.writeUTF("Doctor record not found in doctors table.");
+                        }
+                    }
+                } catch (SQLException ex) {
+                    Logger.getLogger(ServerThread.class.getName()).log(Level.SEVERE, "DB error during doctor login", ex);
+                    outputStream.writeBoolean(false);
+                    outputStream.writeUTF("Login error: " + ex.getMessage());
                 }
                 outputStream.flush();
             } catch (Exception e) {
@@ -930,28 +1261,6 @@ public class ServerThread {
                 outputStream.writeBoolean(false);
                 outputStream.writeUTF("Login error: " + e.getMessage());
                 outputStream.flush();
-            }
-        }
-
-        private Sex parseSex(String sexStr) {
-            if (sexStr == null) {
-                throw new IllegalArgumentException("Sex value is null");
-            }
-            String s = sexStr.toUpperCase();
-
-            // Map common cases
-            if (s.equals("M") || s.equals("MALE") || s.equals("MAN") || s.equals("H") || s.equals("HOMBRE")) {
-                return Sex.MALE;
-            }
-            if (s.equals("F") || s.equals("FEMALE") || s.equals("W") || s.equals("WOMAN") || s.equals("MUJER")) {
-                return Sex.FEMALE;
-            }
-
-            // Try direct enum name (in case client already sends MALE/FEMALE or other valid names)
-            try {
-                return Sex.valueOf(s);
-            } catch (IllegalArgumentException ex) {
-                throw new IllegalArgumentException("Valor de sexo no reconocido: " + sexStr);
             }
         }
 
@@ -1266,27 +1575,23 @@ public class ServerThread {
             return diagnosisFile;
         }
 
-        //to use: int idDiagnosisFile = address[0];
-        //        int position =address[1];
-        public Integer[] slipFragmentAddress(String fragmentAddress) throws IOException {
-            String[] parts = fragmentAddress.split(",");
-            Integer[] address = new Integer[parts.length];
-            if (parts.length != 2) {
-                outputStream.writeBoolean(false);
-                outputStream.writeUTF("Error: fragment format must be 'idDiagnosisFile,position'");
-                outputStream.flush();
-            }
-            address[0] = Integer.parseInt(parts[0].trim());
-            address[1] = Integer.parseInt(parts[1].trim());
-
-            return address;
-        }
-
-        public void sendFragmentofRecording(int idDiagnosisFile, int position) {
+        public void sendFragmentofRecording(String fragment) {
             DataOutputStream outputStream = null;
 
             try {
                 outputStream = new DataOutputStream(socket.getOutputStream());
+
+                // 1) Parsear el String recibido: "idDiagnosisFile,position"
+                String[] parts = fragment.split(",");
+                if (parts.length != 2) {
+                    outputStream.writeBoolean(false);
+                    outputStream.writeUTF("Error: fragment format must be 'idDiagnosisFile,position'");
+                    outputStream.flush();
+                    return;
+                }
+
+                int idDiagnosisFile = Integer.parseInt(parts[0].trim());
+                int position = Integer.parseInt(parts[1].trim());
 
                 System.out.println("Request fragment -> idDiagnosisFile="
                         + idDiagnosisFile + ", position=" + position);
@@ -1338,25 +1643,6 @@ public class ServerThread {
             }
         }
 
-        public String receivedFragmentAddress() {
-            String fragmentAddress = null;
-            try {
-                // Esperamos a recibir el mensaje del paciente (la dirección del fragmento)
-                InputStream inputStream = socket.getInputStream();
-                ObjectInputStream objectInputStream = new ObjectInputStream(inputStream);
-
-                // Recibimos la dirección del fragmento como String
-                fragmentAddress = (String) objectInputStream.readObject();
-
-                // Aquí puedes agregar cualquier lógica adicional si es necesario
-            } catch (IOException | ClassNotFoundException e) {
-                // Manejo de errores
-                System.err.println("Error al recibir la dirección del fragmento: " + e.getMessage());
-            }
-            return fragmentAddress;
-        }
-
-
         public void sendStateOfFragmentsOfRecordingByID(int idDiagnosisFile) {
             try {
                 DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream());
@@ -1394,6 +1680,8 @@ public class ServerThread {
                 e.printStackTrace();
             }
         }
+
+
 
     }
 

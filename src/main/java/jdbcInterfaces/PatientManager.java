@@ -10,7 +10,7 @@ public interface PatientManager {
     void addPatient(Patient p) throws SQLException;
     Patient getPatientByUserId(int userId) throws SQLException;
     List<DiagnosisFile> getAllDiagnosisFilesFromPatient(int idPatient)throws SQLException;
-    String getFracmentofRecoring(int idDiagnosisFile, int position)throws SQLException;
+    String getFragmentOfRecording(int idDiagnosisFile, int position)throws SQLException;
     List<Boolean> getSateOfFragmentsOfRecordingByID(int idDiagnosisFile)throws SQLException;
     void AddNewDiagnosisFile(DiagnosisFile diagnosisFile)throws SQLException;
 }
