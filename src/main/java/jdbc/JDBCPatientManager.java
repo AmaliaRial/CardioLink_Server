@@ -211,10 +211,11 @@ import java.util.List;
 
          String sql = "SELECT df.id, df.symptoms, df.diagnosis, df.medication, df.date, df.patientId, df.status " +
                  "FROM diagnosisFiles df " +
-                 "WHERE df.patientId = ?";
+                 "WHERE df.patientId = ? AND df.status = TRUE";
 
          try (Connection c = conMan.getConnection();
               PreparedStatement ps = c.prepareStatement(sql)) {
+
              // Establecer el id del paciente en la consulta
              ps.setInt(1, idPatient);
 
@@ -222,6 +223,7 @@ import java.util.List;
                  // Procesar los resultados
                  while (rs.next()) {
                      int id = rs.getInt("id");
+
                      ArrayList<String> symptoms = new ArrayList<>();
                      String symptomsStr = rs.getString("symptoms");
                      if (symptomsStr != null && !symptomsStr.isEmpty()) {
@@ -229,6 +231,7 @@ import java.util.List;
                              symptoms.add(symptom.trim());
                          }
                      }
+
                      String diagnosis = rs.getString("diagnosis");
                      String medication = rs.getString("medication");
                      LocalDate date = rs.getDate("date").toLocalDate();
@@ -239,13 +242,10 @@ import java.util.List;
                      DiagnosisFile diagnosisFile = new DiagnosisFile(id, symptoms, diagnosis, medication, date, patientId, status);
                      diagnosisFiles.add(diagnosisFile);
                  }
-             } catch (SQLException e) {
-                 e.printStackTrace();
-                 // Manejo de errores si es necesario
              }
+
          } catch (SQLException e) {
              e.printStackTrace();
-             // Manejo de errores si es necesario
          }
 
          return diagnosisFiles;
@@ -340,6 +340,95 @@ import java.util.List;
              System.out.println("Error adding new DiagnosisFile to the database.");
              e.printStackTrace();
          }
+     }
+
+     @Override
+     public int returnIdOfLastDiagnosisFile() throws SQLException {
+            String sql = "SELECT MAX(id) AS lastId FROM diagnosisFiles";
+
+            try (Connection c = conMan.getConnection();
+                PreparedStatement ps = c.prepareStatement(sql)) {
+
+                ResultSet rs = ps.executeQuery();
+
+                if (rs.next()) {
+                    return rs.getInt("lastId");
+                } else {
+                    throw new SQLException("No DiagnosisFiles found in the database.");
+                }
+
+            } catch (SQLException e) {
+                System.out.println("Error retrieving the last DiagnosisFile ID from the database.");
+                e.printStackTrace();
+                throw e;  // Rethrow the exception after logging
+            }
+     }
+
+     @Override
+     public void saveFragmentOfRecording(int idDiagnosisFile, String fragmentData) throws SQLException {
+            String sql = "INSERT INTO recordings (diagnosisFileId, data, anomaly, sequence) " +
+                    "VALUES (?, ?, ?, ?)";
+
+            try (Connection c = conMan.getConnection();
+                PreparedStatement ps = c.prepareStatement(sql)) {
+
+                // For simplicity, let's assume 'anomaly' is false and 'sequence' is auto-incremented
+                ps.setInt(1, idDiagnosisFile);
+                ps.setString(2, fragmentData);
+                ps.setBoolean(3, false);  // Defaulting anomaly to false
+
+                // Get the next sequence number for this diagnosisFileId
+                int nextSequence = getNextSequenceNumber(c, idDiagnosisFile);
+                ps.setInt(4, nextSequence);
+
+                ps.executeUpdate();
+                System.out.println("Fragment of recording saved successfully.");
+
+            } catch (SQLException e) {
+                System.out.println("Error saving fragment of recording to the database.");
+                e.printStackTrace();
+            }
+     }
+    @Override
+     public int getNextSequenceNumber(Connection c, int idDiagnosisFile) {
+            String sql = "SELECT MAX(sequence) AS maxSeq FROM recordings WHERE diagnosisFileId = ?";
+            try (PreparedStatement ps = c.prepareStatement(sql)) {
+                ps.setInt(1, idDiagnosisFile);
+                ResultSet rs = ps.executeQuery();
+                if (rs.next()) {
+                    int maxSeq = rs.getInt("maxSeq");
+                    return maxSeq + 1;  // Next sequence number
+                } else {
+                    return 1;  // Start from 1 if no records exist
+                }
+            } catch (SQLException e) {
+                System.out.println("Error retrieving next sequence number from the database.");
+                e.printStackTrace();
+                return 1;  // Default to 1 in case of error
+            }
+     }
+
+     @Override
+     public void updateSymptomsInDiagnosisFile(int idDiagnosisFile, String selectedSymptoms) {
+            String sql = "UPDATE diagnosisFiles SET symptoms = ? WHERE id = ?";
+
+            try (Connection c = conMan.getConnection();
+                PreparedStatement ps = c.prepareStatement(sql)) {
+
+                ps.setString(1, selectedSymptoms);
+                ps.setInt(2, idDiagnosisFile);
+
+                int rowsAffected = ps.executeUpdate();
+                if (rowsAffected > 0) {
+                    System.out.println("Symptoms updated successfully for DiagnosisFile ID: " + idDiagnosisFile);
+                } else {
+                    System.out.println("No DiagnosisFile found with ID: " + idDiagnosisFile);
+                }
+
+            } catch (SQLException e) {
+                System.out.println("Error updating symptoms in DiagnosisFile.");
+                e.printStackTrace();
+            }
      }
 
 

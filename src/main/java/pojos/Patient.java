@@ -231,6 +231,15 @@ public class Patient implements PatientInterface {
         return sb.toString();
     }
 
+    public String listOfDiagnosisFilesToString() {
+        StringBuilder sb = new StringBuilder();
+        for (DiagnosisFile diagnosis : diagnosisList) {
+            sb.append(diagnosis.toString());
+            sb.append("\n");
+        }
+        return sb.toString();
+    }
+
 
 
 }
