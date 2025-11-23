@@ -21,6 +21,7 @@ public interface DoctorManager {
     String getFracmentofRecoring(int idDiagnosisFile, int position)throws SQLException ;
     List<Boolean> getSateOfFragmentsOfRecordingByID(int idDiagnosisFile)throws SQLException;
     void addDoctor(Doctor doctor) throws SQLException;
+    List<String> getAllPatientsInsuranceNumberbyDoctor(int idDoctor)throws SQLException;
 
 }
 

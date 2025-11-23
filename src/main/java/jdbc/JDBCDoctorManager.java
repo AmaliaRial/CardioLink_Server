@@ -52,6 +52,36 @@ public class JDBCDoctorManager implements DoctorManager {
     }
 
     @Override
+    public List<String> getAllPatientsInsuranceNumberbyDoctor(int idDoctor) throws SQLException {
+        List<String> insuranceNumbers = new ArrayList<>();
+
+        String sql = "SELECT healthInsuranceNumberPatient " +
+                "FROM patients " +
+                "WHERE doctorId = ?";
+
+        try (Connection c = conMan.getConnection();
+             PreparedStatement ps = c.prepareStatement(sql)) {
+
+            ps.setInt(1, idDoctor);
+
+            try (ResultSet rs = ps.executeQuery()) {
+
+                while (rs.next()) {
+                    String insurance = String.valueOf(rs.getInt("healthInsuranceNumberPatient"));
+                    insuranceNumbers.add(insurance);
+                }
+
+            }
+
+        } catch (SQLException e) {
+            System.out.println("Error retrieving insurance numbers from database.");
+            e.printStackTrace();
+        }
+
+        return insuranceNumbers;
+    }
+
+    @Override
     public Doctor getDoctorbyUserId(int userId) throws SQLException{
         String sql = "SELECT * FROM doctors WHERE userId = ?";
         try (Connection c = conMan.getConnection();

@@ -1611,15 +1611,30 @@ public class ServerThread {
         }
 
         private void doOpenSearchPatient() throws IOException {
-            // Tell client to show search UI or ask for criteria
-            outputStream.writeUTF("SEARCH_PATIENT_OPEN");
+            try {
+                List<String> InsuranceNumbers= doctorMan.getAllPatientsInsuranceNumberbyDoctor(loggedDoctor.getIdDoctor());
+                String InsuranceNumbersMessage=  String.join(", ", InsuranceNumbers);
+
+                outputStream.writeUTF("InsuranceNumbersMessage");
+
+            } catch (SQLException e) {
+                throw new RuntimeException(e);
+            }
         }
 
         private void doSelectPatientAndShowInfo() throws IOException {
+            try {
             // Read chosen patient from client, set selectedPatient, send info
-            // int patientId = inputStream.readInt();
-            // selectedPatient = patientDAO.findById(patientId);
-            outputStream.writeUTF("VIEW_PATIENT_INFO");
+            int PatientHIN = inputStream.readInt();
+            Patient selectedPatient = doctorMan.getPatientByHIN(PatientHIN);
+            List<DiagnosisFile> diagnosisFiles = doctorMan.getAllDiagnosisFilesFromPatient(selectedPatient.getIdPatient());
+            selectedPatient.setDiagnosisList(diagnosisFiles);
+            outputStream.writeUTF("PATIENT_OVERVIEW_SENT");
+            outputStream.writeUTF(selectedPatient.toString());
+
+            } catch (SQLException e) {
+                throw new RuntimeException(e);
+            }
         }
 
         private void doViewDiagnosisFileListForPatient() throws IOException {
