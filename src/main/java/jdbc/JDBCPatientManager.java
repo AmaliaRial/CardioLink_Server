@@ -454,6 +454,34 @@ import java.util.List;
              return null;
          }
      }
+     @Override
+     public List<String> getAllFragmentsOfRecording(int id_DiagnosisFile) throws SQLException {
+         List<String> fragments = new ArrayList<>();
+
+         String sql = "SELECT data FROM recordings WHERE diagnosisFileId = ? ORDER BY sequence ASC";
+
+         try (Connection c = conMan.getConnection();
+              PreparedStatement ps = c.prepareStatement(sql)) {
+
+             ps.setInt(1, id_DiagnosisFile);
+
+             try (ResultSet rs = ps.executeQuery()) {
+
+                 while (rs.next()) {
+                     String fragment = rs.getString("data");
+                     fragments.add(fragment);
+                 }
+
+             }
+
+         } catch (SQLException e) {
+             System.out.println("Error getting fragments of recording.");
+             e.printStackTrace();
+         }
+
+         return fragments;
+     }
+
 
 
  }

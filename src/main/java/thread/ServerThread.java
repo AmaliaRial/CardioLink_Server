@@ -27,6 +27,7 @@ import org.springframework.security.crypto.bcrypt.BCrypt;
 import pojos.enums.Sex;
 
 import javax.print.Doc;
+import javax.swing.*;
 
 public class ServerThread {
 
@@ -468,7 +469,7 @@ public class ServerThread {
             switch (command) {
                 case "VIEW_RECORDING":
                     // handleViewRecordingList(selectedDiagnosisFileId);
-                    handleViewRecordingList();
+                    handleViewRecording();
                     state = State.VIEW_RECORDING;
                     return true;
 
@@ -671,25 +672,105 @@ public class ServerThread {
             }
         }
 
-        private void handleViewRecordingList() throws IOException {
-            // Query recordings for selected diagnosis file and send to client
-            outputStream.writeUTF("RECORDING_LIST ...");
+        private void handleViewRecording() throws IOException {
+            try {
+                String adreess = inputStream.readUTF();
+                if(!adreess.isEmpty()) {
+                    String[] partes = adreess.split(",");
+                    int id_diagnosisFile = Integer.parseInt(partes[0].trim());
+                    int sequence = Integer.parseInt(partes[1].trim());
+                    String fragment= patientMan.getFragmentOfRecording(id_diagnosisFile,sequence);
+                    List<Boolean> states = patientMan.getSateOfFragmentsOfRecordingByID(id_diagnosisFile);
+
+                    StringBuilder stateStringB = new StringBuilder();
+
+                    for (Boolean state : states) {
+                        stateStringB.append(state).append(",");
+                    }
+                    if (stateStringB.length() > 0) {
+                        stateStringB.deleteCharAt(stateStringB.length() - 1);
+                    }
+
+                    String stateString = stateStringB.toString();
+                    outputStream.writeUTF(fragment);
+                    outputStream.writeUTF(stateString);
+
+                }else{
+                    outputStream.writeUTF("FAILED_TO_CONNET");
+                }
+            } catch (SQLException e) {
+                throw new RuntimeException(e);
+            }
         }
 
         private void handleChangeFragment() throws IOException {
-            // Read fragment index from client, send fragment data, etc.
-            // Example:
-            // int fragmentIndex = inputStream.readInt();
-            // send fragment for given recording
+            try {
+                String adreess = inputStream.readUTF();
+                if(!adreess.isEmpty()) {
+                    String[] partes = adreess.split(",");
+                    int id_diagnosisFile = Integer.parseInt(partes[0].trim());
+                    int sequence = Integer.parseInt(partes[1].trim());
+                    String fragment= patientMan.getFragmentOfRecording(id_diagnosisFile,sequence);
+
+                    outputStream.writeUTF(fragment);
+
+                }else{
+                    outputStream.writeUTF("FAILED_TO_CONNET");
+                }
+            } catch (SQLException e) {
+                throw new RuntimeException(e);
+            }
             outputStream.writeUTF("FRAGMENT_CHANGED");
         }
 
-        private void handleDownloadRecording() throws IOException {
-            // Send full recording to client (e.g. as binary or chunked)
-            outputStream.writeUTF("DOWNLOAD_STARTED");
-            // ... stream data ...
+        private void handleDownloadRecording() {
+            try {
+            String idDiagnosisFile = inputStream.readUTF();
+            outputStream.writeUTF("SENDING_RECORDING");
+            List<String> fragmentList= patientMan.getAllFragmentsOfRecording(Integer.parseInt(idDiagnosisFile));
+
+            String[] signals = joinFragmentsAsStrings(fragmentList);
+            String ecgString = signals[0];
+            String edaString = signals[1];
+
+            outputStream.writeUTF(ecgString);
+            outputStream.writeUTF(edaString);
             outputStream.writeUTF("DOWNLOAD_FINISHED");
+            } catch (IOException | SQLException e) {
+                throw new RuntimeException(e);
+            }
         }
+
+        public String[] joinFragmentsAsStrings(List<String> fragments) {
+
+            StringBuilder ecgBuilder = new StringBuilder();
+            StringBuilder edaBuilder = new StringBuilder();
+
+            for (String fragment : fragments) {
+                // fragment tiene formato "ecg1,ecg2,...;eda1,eda2,..."
+                String[] parts = fragment.split(";");
+                String ecgPart = parts[0].trim();
+                String edaPart = parts[1].trim();
+
+                ecgBuilder.append(ecgPart).append(",");
+                edaBuilder.append(edaPart).append(",");
+            }
+
+            // Quitar la última coma si existe
+            if (ecgBuilder.length() > 0) {
+                ecgBuilder.deleteCharAt(ecgBuilder.length() - 1);
+            }
+            if (edaBuilder.length() > 0) {
+                edaBuilder.deleteCharAt(edaBuilder.length() - 1);
+            }
+
+            String ecgString = ecgBuilder.toString();
+            String edaString = edaBuilder.toString();
+
+            // [0] = ECG, [1] = EDA
+            return new String[] { ecgString, edaString };
+        }
+
 
         /* ============================ RESOURCE CLEANUP ============================ */
 
