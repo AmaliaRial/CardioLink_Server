@@ -15,6 +15,7 @@ public class DiagnosisFile {
     public DiagnosisFile(int id) {
         this.date=LocalDate.now();
         this.id = id;
+        this.status=false;
 
     }
     public DiagnosisFile() {
@@ -22,7 +23,7 @@ public class DiagnosisFile {
     }
 
 
-    public DiagnosisFile(int id, ArrayList<String> symptomsStr, String diagnosis, String medication, LocalDate date, int patientId, boolean status) {
+    public DiagnosisFile(int id, ArrayList<String> symptomsStr, String diagnosis, String medication,LocalDate date, int patientId, boolean status) {
         this.id=id;
         this.symptoms=symptomsStr;
         this.diagnosis=diagnosis;

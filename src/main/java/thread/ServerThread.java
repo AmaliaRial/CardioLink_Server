@@ -630,13 +630,37 @@ public class ServerThread {
         private void handleStart() throws IOException {
             // Here you can start ECG/EDA acquisition, etc.
             // Use ECG and EDA lists if needed.
-            outputStream.writeUTF("START_OK");
+            DiagnosisFile df = new DiagnosisFile(loggedPatient.getIdPatient());
+            try {
+                patientMan.AddNewDiagnosisFile(df);
+                df.setId(patientMan.returnIdOfLastDiagnosisFile());
+                outputStream.writeUTF("READY_TO_RECORD");
+                String message= inputStream.readUTF();
+                if (!message.equals("STOP")) {
+                    patientMan.saveFragmentOfRecording(df.getId(), message);
+                } else if(message.equals("STOP")){
+                    handleEndOfRecording();
+                    outputStream.writeUTF("RECORDING_STOP");
+
+                    outputStream.writeUTF("SELECT_SYMPTOMS");
+                    String selectedSymptoms = inputStream.readUTF();
+                    if (selectedSymptoms != null && !selectedSymptoms.isEmpty()) {
+                        patientMan.updateSymptomsInDiagnosisFile(df.getId(), selectedSymptoms);
+                        outputStream.writeUTF("SYMPTOMS_RECEIVED");
+                    }
+
+                }
+            } catch (SQLException e) {
+                throw new RuntimeException(e);
+            }
+
+
         }
 
         private void handleViewPatientOverview() throws IOException {
             // Send basic info about loggedPatient to client
             if (loggedPatient != null) {
-                outputStream.writeUTF("PATIENT_INFO " + loggedPatient.getNamePatient());
+                outputStream.writeUTF(loggedPatient.toString());
             } else {
                 outputStream.writeUTF("ERROR No patient logged in");
             }
