@@ -211,10 +211,11 @@ import java.util.List;
 
          String sql = "SELECT df.id, df.symptoms, df.diagnosis, df.medication, df.date, df.patientId, df.status " +
                  "FROM diagnosisFiles df " +
-                 "WHERE df.patientId = ?";
+                 "WHERE df.patientId = ? AND df.status = TRUE";
 
          try (Connection c = conMan.getConnection();
               PreparedStatement ps = c.prepareStatement(sql)) {
+
              // Establecer el id del paciente en la consulta
              ps.setInt(1, idPatient);
 
@@ -222,6 +223,7 @@ import java.util.List;
                  // Procesar los resultados
                  while (rs.next()) {
                      int id = rs.getInt("id");
+
                      ArrayList<String> symptoms = new ArrayList<>();
                      String symptomsStr = rs.getString("symptoms");
                      if (symptomsStr != null && !symptomsStr.isEmpty()) {
@@ -229,6 +231,7 @@ import java.util.List;
                              symptoms.add(symptom.trim());
                          }
                      }
+
                      String diagnosis = rs.getString("diagnosis");
                      String medication = rs.getString("medication");
                      LocalDate date = rs.getDate("date").toLocalDate();
@@ -239,13 +242,10 @@ import java.util.List;
                      DiagnosisFile diagnosisFile = new DiagnosisFile(id, symptoms, diagnosis, medication, date, patientId, status);
                      diagnosisFiles.add(diagnosisFile);
                  }
-             } catch (SQLException e) {
-                 e.printStackTrace();
-                 // Manejo de errores si es necesario
              }
+
          } catch (SQLException e) {
              e.printStackTrace();
-             // Manejo de errores si es necesario
          }
 
          return diagnosisFiles;
