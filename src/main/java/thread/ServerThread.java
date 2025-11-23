@@ -442,8 +442,8 @@ public class ServerThread {
             switch (command) {
                 case "VIEW_DIAGNOSIS_FILE":
                     // You probably want some selection logic:
-                    // handleViewDiagnosisFileList(loggedPatient.getIdPatient());
-                    handleViewDiagnosisFileList();
+                    // handleViewDiagnosisFile(loggedPatient.getIdPatient());
+
                     state = State.VIEW_DIAGNOSIS_FILE;
                     return true;
 
@@ -660,15 +660,15 @@ public class ServerThread {
         private void handleViewPatientOverview() throws IOException {
             // Send basic info about loggedPatient to client
             if (loggedPatient != null) {
-                outputStream.writeUTF(loggedPatient.toString());
-            } else {
-                outputStream.writeUTF("ERROR No patient logged in");
-            }
-        }
+                String docName = patientMan.getDoctornameByPatient(loggedPatient);
+                List<DiagnosisFile> diagnosisFiles = patientMan.getAllDiagnosisFilesFromPatient(loggedPatient.getIdPatient());
+                loggedPatient.setDiagnosisList(diagnosisFiles);
+                outputStream.writeUTF(docName+","+loggedPatient.listOfDiagnosisFilesToString());
+                outputStream.writeUTF("PATIENT_OVERVIEW_SENT");
 
-        private void handleViewDiagnosisFileList() throws IOException {
-            // Query diagnosis files for loggedPatient and send them to client
-            outputStream.writeUTF("DIAGNOSIS_FILE_LIST ...");
+            } else {
+                outputStream.writeUTF("ERROR: No patient logged in");
+            }
         }
 
         private void handleViewRecordingList() throws IOException {

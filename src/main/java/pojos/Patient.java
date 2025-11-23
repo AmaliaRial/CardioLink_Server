@@ -185,6 +185,9 @@ public class Patient implements PatientInterface {
                 ", userId=" + userId +
                 '}';
     }
+    public String DiagnosisFilestoString() {
+        return "diagnosisFile=" + diagnosisList ;
+    }
 
     public void addDiagnosisToDiagnosisList(DiagnosisFile diagnosis) {
         this.diagnosisList.add(diagnosis);
