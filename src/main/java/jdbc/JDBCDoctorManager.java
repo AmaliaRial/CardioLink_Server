@@ -82,6 +82,110 @@ public class JDBCDoctorManager implements DoctorManager {
     }
 
     @Override
+    public List<String> getAllFragmentsOfRecording(int id_DiagnosisFile) throws SQLException {
+        List<String> fragments = new ArrayList<>();
+
+        String sql = "SELECT data FROM recordings WHERE diagnosisFileId = ? ORDER BY sequence ASC";
+
+        try (Connection c = conMan.getConnection();
+             PreparedStatement ps = c.prepareStatement(sql)) {
+
+            ps.setInt(1, id_DiagnosisFile);
+
+            try (ResultSet rs = ps.executeQuery()) {
+
+                while (rs.next()) {
+                    String fragment = rs.getString("data");
+                    fragments.add(fragment);
+                }
+
+            }
+
+        } catch (SQLException e) {
+            System.out.println("Error getting fragments of recording.");
+            e.printStackTrace();
+        }
+
+        return fragments;
+    }
+
+    @Override
+    public DiagnosisFile getDiagnosisFileByID(int idDiagnosisFile) throws SQLException {
+        String sql = "SELECT * FROM diagnosisFiles WHERE id = ?";
+        try (Connection c = conMan.getConnection();
+             PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setInt(1, idDiagnosisFile);
+            ResultSet rs = ps.executeQuery();
+
+            if (rs.next()) {
+                ArrayList<String> symptoms = new ArrayList<>();
+                String symptomsStr = rs.getString("symptoms");
+                if (symptomsStr != null && !symptomsStr.isEmpty()) {
+                    for (String symptom : symptomsStr.split(",")) {
+                        symptoms.add(symptom.trim());
+                    }
+                }
+                DiagnosisFile df = new DiagnosisFile(
+                        rs.getInt("id"),
+                        symptoms,
+                        rs.getString("diagnosis"),
+                        rs.getString("medication"),
+                        rs.getDate("date").toLocalDate(),
+                        rs.getInt("patientId"),
+                        rs.getBoolean("status")
+                );
+                return df;
+            }
+            return null;
+        }
+    }
+
+    @Override
+    public List<DiagnosisFile> listRecentDiagnosisFilesByDoctor(int idDoctor) throws SQLException {
+        List<DiagnosisFile> diagnosisFiles = new ArrayList<>();
+
+        String sql = "SELECT df.id, df.symptoms, df.diagnosis, df.medication, df.date, df.patientId, df.status " +
+                "FROM diagnosisFiles df " +
+                "JOIN patients p ON df.patientId = p.idPatient " +
+                "WHERE p.doctorId = ? " +
+                "ORDER BY df.date DESC " +
+                "LIMIT 5";
+
+        try (Connection c = conMan.getConnection();
+             PreparedStatement ps = c.prepareStatement(sql)) {
+
+            ps.setInt(1, idDoctor);
+
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    int id = rs.getInt("id");
+                    ArrayList<String> symptoms = new ArrayList<>();
+                    String symptomsStr = rs.getString("symptoms");
+                    if (symptomsStr != null && !symptomsStr.isEmpty()) {
+                        for (String symptom : symptomsStr.split(",")) {
+                            symptoms.add(symptom.trim());
+                        }
+                    }
+                    String diagnosis = rs.getString("diagnosis");
+                    String medication = rs.getString("medication");
+                    LocalDate date = rs.getDate("date").toLocalDate();
+                    int patientId = rs.getInt("patientId");
+                    boolean status = rs.getBoolean("status");
+
+                    DiagnosisFile diagnosisFile = new DiagnosisFile(id, symptoms, diagnosis, medication, date, patientId, status);
+                    diagnosisFiles.add(diagnosisFile);
+                }
+            }
+
+        } catch (SQLException e) {
+            System.out.println("Error retrieving recent diagnosis files from database.");
+            e.printStackTrace();
+        }
+
+        return diagnosisFiles;
+    }
+
+    @Override
     public Doctor getDoctorbyUserId(int userId) throws SQLException{
         String sql = "SELECT * FROM doctors WHERE userId = ?";
         try (Connection c = conMan.getConnection();
@@ -457,7 +561,7 @@ public class JDBCDoctorManager implements DoctorManager {
     }
 
     @Override
-    public String getFracmentofRecoring(int idDiagnosisFile, int position) throws SQLException {
+    public String getFragmentOfRecording(int idDiagnosisFile, int position) throws SQLException {
         String sql = "SELECT data FROM recordings WHERE diagnosisFileId = ? AND sequence = ?";
 
         try (Connection c = conMan.getConnection();  // Assuming conMan.getConnection() returns a valid DB connection

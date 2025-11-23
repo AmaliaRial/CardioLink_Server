@@ -725,17 +725,17 @@ public class ServerThread {
 
         private void handleDownloadRecording() {
             try {
-            String idDiagnosisFile = inputStream.readUTF();
-            outputStream.writeUTF("SENDING_RECORDING");
-            List<String> fragmentList= patientMan.getAllFragmentsOfRecording(Integer.parseInt(idDiagnosisFile));
+                String idDiagnosisFile = inputStream.readUTF();
+                outputStream.writeUTF("SENDING_RECORDING");
+                List<String> fragmentList= patientMan.getAllFragmentsOfRecording(Integer.parseInt(idDiagnosisFile));
 
-            String[] signals = joinFragmentsAsStrings(fragmentList);
-            String ecgString = signals[0];
-            String edaString = signals[1];
+                String[] signals = joinFragmentsAsStrings(fragmentList);
+                String ecgString = signals[0];
+                String edaString = signals[1];
 
-            outputStream.writeUTF(ecgString);
-            outputStream.writeUTF(edaString);
-            outputStream.writeUTF("DOWNLOAD_FINISHED");
+                outputStream.writeUTF(ecgString);
+                outputStream.writeUTF(edaString);
+                outputStream.writeUTF("DOWNLOAD_FINISHED");
             } catch (IOException | SQLException e) {
                 throw new RuntimeException(e);
             }
@@ -1625,12 +1625,12 @@ public class ServerThread {
         private void doSelectPatientAndShowInfo() throws IOException {
             try {
             // Read chosen patient from client, set selectedPatient, send info
-            int PatientHIN = inputStream.readInt();
-            Patient selectedPatient = doctorMan.getPatientByHIN(PatientHIN);
-            List<DiagnosisFile> diagnosisFiles = doctorMan.getAllDiagnosisFilesFromPatient(selectedPatient.getIdPatient());
-            selectedPatient.setDiagnosisList(diagnosisFiles);
-            outputStream.writeUTF("PATIENT_OVERVIEW_SENT");
-            outputStream.writeUTF(selectedPatient.toString());
+                int PatientHIN = inputStream.readInt();
+                Patient selectedPatient = doctorMan.getPatientByHIN(PatientHIN);
+                List<DiagnosisFile> diagnosisFiles = doctorMan.getAllDiagnosisFilesFromPatient(selectedPatient.getIdPatient());
+                selectedPatient.setDiagnosisList(diagnosisFiles);
+                outputStream.writeUTF("PATIENT_OVERVIEW_SENT");
+                outputStream.writeUTF(selectedPatient.toString());
 
             } catch (SQLException e) {
                 throw new RuntimeException(e);
@@ -1643,27 +1643,127 @@ public class ServerThread {
 
         private void doDownloadDiagnosisFile() throws IOException {
             outputStream.writeUTF("DOWNLOAD_DIAGNOSISFILE_STARTED");
-            // ... send data ...
+            try{
+                String idDiagnosisFile = inputStream.readUTF();
+                int idDF = Integer.parseInt(idDiagnosisFile);
+                DiagnosisFile diagnosisFile = doctorMan.getDiagnosisFileByID(idDF);
+                outputStream.writeUTF(diagnosisFile.toString());
+            } catch (IOException | SQLException e) {
+                throw new RuntimeException(e);
+            }
             outputStream.writeUTF("DOWNLOAD_DIAGNOSISFILE_FINISHED");
         }
 
         private void doViewRecordingListForDiagnosisFile() throws IOException {
-            outputStream.writeUTF("RECORDING_LIST_FOR_DIAGNOSISFILE");
+            try {
+                String df = inputStream.readUTF();
+                if(!df.isEmpty()) {
+                    int id_diagnosisFile = Integer.parseInt(df);
+                    int sequence = 1;
+                    String fragment = null;
+                    List<Boolean> states = patientMan.getSateOfFragmentsOfRecordingByID(id_diagnosisFile);
+                    while((fragment = doctorMan.getFragmentOfRecording(id_diagnosisFile,sequence)) != null){
+                        Boolean state = states.get(sequence -1);
+                        String stateString = state.toString();
+
+                        outputStream.writeUTF(fragment);
+                        outputStream.writeUTF(stateString);
+
+                        sequence++;
+                    }
+                }else{
+                    outputStream.writeUTF("FAILED_TO_CONNET");
+                }
+            } catch (SQLException e) {
+                throw new RuntimeException(e);
+            }
+
+            outputStream.writeUTF("RECORDING_LIST_FOR_DIAGNOSISFILE_ENDED");
         }
 
         private void doChangeFragment() throws IOException {
-            // int fragmentIndex = inputStream.readInt();
+            try {
+                String adreess = inputStream.readUTF();
+                if(!adreess.isEmpty()) {
+                    String[] partes = adreess.split(",");
+                    int id_diagnosisFile = Integer.parseInt(partes[0].trim());
+                    int sequence = Integer.parseInt(partes[1].trim());
+                    String fragment= doctorMan.getFragmentOfRecording(id_diagnosisFile,sequence);
+
+                    outputStream.writeUTF(fragment);
+
+                }else{
+                    outputStream.writeUTF("FAILED_TO_CONNET");
+                }
+            } catch (SQLException e) {
+                throw new RuntimeException(e);
+            }
             outputStream.writeUTF("FRAGMENT_CHANGED");
         }
 
         private void doDownloadRecording() throws IOException {
-            outputStream.writeUTF("DOWNLOAD_RECORDING_STARTED");
-            // ... send data ...
+            try {
+                String idDiagnosisFile = inputStream.readUTF();
+                int idDF = Integer.parseInt(idDiagnosisFile);
+                outputStream.writeUTF("DOWNLOAD_RECORDING_STARTED");
+                List<String> fragmentList = doctorMan.getAllFragmentsOfRecording(idDF);
+                List<Boolean> stateList = doctorMan.getSateOfFragmentsOfRecordingByID(idDF);
+
+                String[] signals = joinFragmentsAsStrings(fragmentList);
+                String ecgString = signals[0];
+                String edaString = signals[1];
+
+                outputStream.writeUTF(ecgString);
+                outputStream.writeUTF(edaString);
+                outputStream.writeUTF("DOWNLOAD_FINISHED");
+            } catch (IOException | SQLException e) {
+                throw new RuntimeException(e);
+            }
             outputStream.writeUTF("DOWNLOAD_RECORDING_FINISHED");
+        }
+
+        public String[] joinFragmentsAsStrings(List<String> fragments) {
+
+            StringBuilder ecgBuilder = new StringBuilder();
+            StringBuilder edaBuilder = new StringBuilder();
+
+            for (String fragment : fragments) {
+                // fragment tiene formato "ecg1,ecg2,...;eda1,eda2,..."
+                String[] parts = fragment.split(";");
+                String ecgPart = parts[0].trim();
+                String edaPart = parts[1].trim();
+
+                ecgBuilder.append(ecgPart).append(",");
+                edaBuilder.append(edaPart).append(",");
+            }
+
+            // Quitar la última coma si existe
+            if (ecgBuilder.length() > 0) {
+                ecgBuilder.deleteCharAt(ecgBuilder.length() - 1);
+            }
+            if (edaBuilder.length() > 0) {
+                edaBuilder.deleteCharAt(edaBuilder.length() - 1);
+            }
+
+            String ecgString = ecgBuilder.toString();
+            String edaString = edaBuilder.toString();
+
+            // [0] = ECG, [1] = EDA
+            return new String[] { ecgString, edaString };
         }
 
         private void doListRecentlyFinished() throws IOException {
             outputStream.writeUTF("RECENTLY_FINISH_LIST");
+            List<DiagnosisFile> recentDF = null;
+            try {
+                recentDF = doctorMan.listRecentDiagnosisFilesByDoctor(loggedDoctor.getIdDoctor());
+            } catch (SQLException e) {
+                throw new RuntimeException(e);
+            }
+            for(DiagnosisFile df: recentDF) {
+                outputStream.writeUTF(df.toString());
+            }
+            outputStream.writeUTF("RECENTLY_FINISHED");
         }
 
         private void doCompleteDiagnosisFileSelection() throws IOException {
@@ -2021,7 +2121,7 @@ public class ServerThread {
                 // 2) Obtener el fragmento desde la BD usando el doctorManager
                 String fragmentData;
                 try {
-                    fragmentData = doctorMan.getFracmentofRecoring(idDiagnosisFile, position);
+                    fragmentData = doctorMan.getFragmentOfRecording(idDiagnosisFile, position);
                 } catch (SQLException e) {
                     System.out.println("SQL error while retrieving recording fragment.");
                     e.printStackTrace();
