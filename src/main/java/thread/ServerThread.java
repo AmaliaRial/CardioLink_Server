@@ -2,6 +2,7 @@ package thread;
 
 import jdbc.*;
 import pojos.DiagnosisFile;
+import pojos.Doctor;
 import pojos.Patient;
 import pojos.User;
 
@@ -13,8 +14,10 @@ import java.sql.*;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.time.LocalDate;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.sql.Date;
+import java.util.Deque;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -22,6 +25,8 @@ import java.util.stream.Collectors;
 
 import org.springframework.security.crypto.bcrypt.BCrypt;
 import pojos.enums.Sex;
+
+import javax.print.Doc;
 
 public class ServerThread {
 
@@ -956,6 +961,8 @@ public class ServerThread {
 
     // SERVER DOCTOR THREAD
     private static class ServerDoctorThread implements Runnable {
+        private static final Logger LOGGER = Logger.getLogger(ServerDoctorThread.class.getName());
+
         private final Socket socket;
         private final DataInputStream inputStream;
         private final DataOutputStream outputStream;
@@ -967,6 +974,23 @@ public class ServerThread {
         // Estado de sesión del doctor (null si no autenticado)
         private Integer loggedDoctorUserId = null;
         private Integer loggedDoctorId = null;
+        private Doctor loggedDoctor=null;
+
+        // All the states that appear in your scheme
+        private enum State {
+            AUTH,                // SIGN_UP / LOG_IN / QUIT
+            DOCTOR_MENU,         // main menu after login
+            SEARCH_PATIENT,      // screen where doctor searches/chooses a patient
+            VIEW_PATIENT,        // info of one patient
+            VIEW_DIAGNOSISFILE,  // list/detail of diagnosis files
+            VIEW_RECORDING,      // recording and fragments
+            RECENTLY_FINISH,     // list of recently finished diagnosis
+            COMPLETE_DIAGNOSISFILE // finishing a diagnosis file
+        }
+
+        // Stack of states to support "go back to previous"
+        private final Deque<State> stateStack = new ArrayDeque<>();
+
 
         // Firma unificada con ServerPatientThread
         private ServerDoctorThread(Socket socket,
@@ -989,93 +1013,310 @@ public class ServerThread {
         @Override
         public void run() {
             try {
-                while (!socket.isClosed()) {
-                    String command;
-                    try {
-                        command = inputStream.readUTF();
-                    } catch (IOException e) {
-                        System.out.println("Doctor disconnected (readUTF failed).");
-                        break;
+                boolean running = true;
+
+                while (running && !socket.isClosed()) {
+
+                    String command = readCommand();
+                    if (command == null) {
+                        break; // client disconnected
+                    }
+                    command = command.trim();
+                    if (command.isEmpty()) {
+                        continue;
                     }
 
-                    switch (command) {
-                        case "SIGNUP":
-                            handleSignupDoctor();
+                    switch (currentState()) {
+                        case AUTH:
+                            running = handleAuthCommand(command);
                             break;
 
-                        case "LOGIN":
-                            handleLoginDoctor();
+                        case DOCTOR_MENU:
+                            running = handleDoctorMenuCommand(command);
                             break;
 
-                        case "LIST_PATIENTS":
-                            handleListPatients();
+                        case SEARCH_PATIENT:
+                            running = handleSearchPatientCommand(command);
                             break;
 
-                        case "GET_DIAGNOSIS":
-                            handleGetDiagnosis();
+                        case VIEW_PATIENT:
+                            running = handleViewPatientCommand(command);
                             break;
 
-                        case "UPDATE_DIAGNOSIS":
-                            handleUpdateDiagnosis();
+                        case VIEW_DIAGNOSISFILE:
+                            running = handleViewDiagnosisFileCommand(command);
                             break;
 
-                        case "UPDATE_MEDICATION":
-                            handleUpdateMedication();
+                        case VIEW_RECORDING:
+                            running = handleViewRecordingCommand(command);
                             break;
 
-                        case "LIST_RECENT_DIAGNOSIS_FILES":
-                            int idDoctor=0;
-                            SendDiagnosisFilesTODO(idDoctor);
+                        case RECENTLY_FINISH:
+                            running = handleRecentlyFinishCommand(command);
                             break;
 
-                        case "SEND_UPDATED_DIAGNOSIS_FILE":
-                            ReceiveUpdatedDiagnosisFile();
-                            break;
-
-                        case "GET_FRAGMENT_OF_RECORDING":
-                            String fragment = "";
-                            sendFragmentofRecording(fragment);
-                            break;
-
-                        case "GET_FRAGMENT_STATES":
-                            int idDiagnosisFile = 0;
-                            sendStateOfFragmentsOfRecordingByID(idDiagnosisFile);
-                            break;
-
-                        case "GET_DIAGNOSIS_FILES_BY_PATIENT_ID":
-                            int idPatient =0;
-                            sendAllDiagnosisFilesFromPatientToDoctor(idPatient);
-                            break;
-
-                        case "LOGOUT":
-                        case "EXIT":
-                            loggedDoctorUserId = null;
-                            loggedDoctorId = null;
-                            outputStream.writeUTF("ACK");
-                            outputStream.writeUTF("Goodbye");
-                            outputStream.flush();
-                            return;
-
-                        case "ERROR":
-                            String err = inputStream.readUTF();
-                            System.err.println("Client reported error: " + err);
-                            break;
-
-                        default:
-                            outputStream.writeUTF("ERROR");
-                            outputStream.writeUTF("Unknown command: " + command);
-                            outputStream.flush();
+                        case COMPLETE_DIAGNOSISFILE:
+                            running = handleCompleteDiagnosisFileCommand(command);
                             break;
                     }
                 }
-            } catch (IOException ex) {
-                Logger.getLogger(ServerThread.class.getName()).log(Level.SEVERE, "Doctor thread IO error", ex);
+
+            } catch (IOException | ParseException ex) {
+                LOGGER.log(Level.SEVERE, "Error in doctor server thread", ex);
+            } catch (Exception e) {
+                LOGGER.log(Level.SEVERE, "Unexpected error in doctor server thread", e);
             } finally {
-                System.out.println("Doctor disconnected");
-                releaseResourcesDoctor(inputStream, socket, outputStream);
+                System.out.println("Doctor client disconnected");
+                releaseResources(inputStream, socket, outputStream);
             }
         }
 
+        /* ============================ STATE STACK HELPERS ============================ */
+
+        private State currentState() {
+            return stateStack.peek();
+        }
+
+        private void goTo(State next) {
+            stateStack.push(next);
+        }
+
+        // In your scheme "BACK_TO_MENU" really means: go back to previous node
+        private void goBack() {
+            if (stateStack.size() > 1) {
+                stateStack.pop();
+            }
+            // if size == 1 we stay in AUTH
+        }
+
+        /* ============================ IO HELPER ============================ */
+
+        private String readCommand() {
+            try {
+                return inputStream.readUTF();
+            } catch (IOException e) {
+                System.out.println("Doctor client disconnected (readUTF failed).");
+                return null;
+            }
+        }
+
+        /* ============================ STATE HANDLERS ============================ */
+
+        // AUTH: SIGN_UP / LOG_IN / QUIT
+        private boolean handleAuthCommand(String command) throws IOException, ParseException {
+            switch (command) {
+                case "SIGNUP":
+                case "SIGN_UP":
+                    handleSignupDoctor();
+                    return true;
+
+                case "LOGIN":
+                case "LOG_IN":
+                    handleLoginDoctor();
+                    if (this.loggedDoctor != null) {
+                        goTo(State.DOCTOR_MENU);
+                        outputStream.writeUTF("LOGIN_OK");
+                    } else {
+                        outputStream.writeUTF("LOGIN_FAILED");
+                    }
+                    return true;
+
+                case "QUIT":
+                    outputStream.writeUTF("BYE");
+                    return false;
+
+                default:
+                    outputStream.writeUTF("ERROR Unknown command in AUTH state");
+                    return true;
+            }
+        }
+
+        // DOCTOR_MENU: from here you go to SEARCH_PATIENT or RECENTLY_FINISH
+        private boolean handleDoctorMenuCommand(String command) throws IOException {
+            switch (command) {
+                case "SEARCH_PATIENT":
+                    // show search UI / ask for criteria
+                    doOpenSearchPatient();
+                    goTo(State.SEARCH_PATIENT);   // next "BACK" will return here
+                    return true;
+
+                case "RECENTLY_FINISH":
+                    doListRecentlyFinished();
+                    goTo(State.RECENTLY_FINISH);  // next "BACK" will return here
+                    return true;
+
+                case "BACK_TO_MENU":
+                    // already at menu – optionally go back to AUTH:
+                    // goBack();
+                    return true;
+
+                case "QUIT":
+                    outputStream.writeUTF("BYE");
+                    return false;
+
+                default:
+                    outputStream.writeUTF("ERROR Unknown command in DOCTOR_MENU state");
+                    return true;
+            }
+        }
+
+        // SEARCH_PATIENT: here the doctor searches and selects a patient
+        // Next: VIEW_PATIENT or back to DOCTOR_MENU
+        private boolean handleSearchPatientCommand(String command) throws IOException {
+            switch (command) {
+                case "VIEW_PATIENT":
+                    // here you normally would read which patient was selected
+                    doSelectPatientAndShowInfo();
+                    goTo(State.VIEW_PATIENT);      // stack: ... -> DOCTOR_MENU -> SEARCH_PATIENT -> VIEW_PATIENT
+                    return true;
+
+                case "BACK_TO_MENU":              // go back one level to DOCTOR_MENU
+                    goBack();
+                    return true;
+
+                case "QUIT":
+                    outputStream.writeUTF("BYE");
+                    return false;
+
+                default:
+                    outputStream.writeUTF("ERROR Unknown command in SEARCH_PATIENT state");
+                    return true;
+            }
+        }
+
+        // VIEW_PATIENT: you came from SEARCH_PATIENT
+        // Next: VIEW_DIAGNOSISFILE or back to SEARCH_PATIENT
+        private boolean handleViewPatientCommand(String command) throws IOException {
+            switch (command) {
+                case "VIEW_DIAGNOSISFILE":
+                    doViewDiagnosisFileListForPatient();
+                    goTo(State.VIEW_DIAGNOSISFILE);   // ★1
+                    return true;
+
+                case "BACK_TO_MENU":                  // really: back to SEARCH_PATIENT
+                    goBack();                         // pops VIEW_PATIENT -> SEARCH_PATIENT on top
+                    return true;
+
+                case "QUIT":
+                    outputStream.writeUTF("BYE");
+                    return false;
+
+                default:
+                    outputStream.writeUTF("ERROR Unknown command in VIEW_PATIENT state");
+                    return true;
+            }
+        }
+
+        // VIEW_DIAGNOSISFILE: shared node ★1 (from VIEW_PATIENT or COMPLETE_DIAGNOSISFILE)
+        // Next: DOWNLOAD_DIAGNOSISFILE / VIEW_RECORDING / back to previous (VIEW_PATIENT or COMPLETE_DIAGNOSISFILE)
+        private boolean handleViewDiagnosisFileCommand(String command) throws IOException {
+            switch (command) {
+                case "DOWNLOAD_DIAGNOSISFILE":
+                    doDownloadDiagnosisFile();
+                    return true;
+
+                case "VIEW_RECORDING":
+                    doViewRecordingListForDiagnosisFile();
+                    goTo(State.VIEW_RECORDING);       // ★2
+                    return true;
+
+                case "BACK_TO_MENU":
+                    // previous could be VIEW_PATIENT or COMPLETE_DIAGNOSISFILE
+                    goBack();
+                    return true;
+
+                case "QUIT":
+                    outputStream.writeUTF("BYE");
+                    return false;
+
+                default:
+                    outputStream.writeUTF("ERROR Unknown command in VIEW_DIAGNOSISFILE state");
+                    return true;
+            }
+        }
+
+        // VIEW_RECORDING: shared node ★2
+        // Next: CHANGE_FRAGMENT / DOWNLOAD_RECORDING / back to VIEW_DIAGNOSISFILE
+        private boolean handleViewRecordingCommand(String command) throws IOException {
+            switch (command) {
+                case "CHANGE_FRAGMENT":
+                    doChangeFragment();
+                    return true;
+
+                case "DOWNLOAD_RECORDING":
+                    doDownloadRecording();
+                    return true;
+
+                case "BACK_TO_MENU":
+                    // back to whatever was before (VIEW_DIAGNOSISFILE)
+                    goBack();
+                    return true;
+
+                case "QUIT":
+                    outputStream.writeUTF("BYE");
+                    return false;
+
+                default:
+                    outputStream.writeUTF("ERROR Unknown command in VIEW_RECORDING state");
+                    return true;
+            }
+        }
+
+        // RECENTLY_FINISH: you came from DOCTOR_MENU
+        // Next: COMPLETE_DIAGNOSISFILE or back to DOCTOR_MENU
+        private boolean handleRecentlyFinishCommand(String command) throws IOException {
+            switch (command) {
+                case "COMPLETE_DIAGNOSISFILE":
+                    doCompleteDiagnosisFileSelection();
+                    goTo(State.COMPLETE_DIAGNOSISFILE);
+                    return true;
+
+                case "BACK_TO_MENU":
+                    // back to DOCTOR_MENU
+                    goBack();
+                    return true;
+
+                case "QUIT":
+                    outputStream.writeUTF("BYE");
+                    return false;
+
+                default:
+                    outputStream.writeUTF("ERROR Unknown command in RECENTLY_FINISH state");
+                    return true;
+            }
+        }
+
+        // COMPLETE_DIAGNOSISFILE: you came from RECENTLY_FINISH
+        // Next: VIEW_DIAGNOSISFILE (★1) / VIEW_RECORDING (★2) / CANCEL(back to RECENTLY_FINISH)
+        private boolean handleCompleteDiagnosisFileCommand(String command) throws IOException {
+            switch (command) {
+                case "VIEW_DIAGNOSISFILE":           // ★1 path
+                    doViewDiagnosisFileFromRecentlyFinished();
+                    goTo(State.VIEW_DIAGNOSISFILE);
+                    return true;
+
+                case "VIEW_RECORDING":               // ★2 path
+                    doViewRecordingFromRecentlyFinished();
+                    goTo(State.VIEW_RECORDING);
+                    return true;
+
+                case "CANCEL":
+                case "BACK_TO_MENU":
+                    // back to RECENTLY_FINISH
+                    goBack();
+                    return true;
+
+                case "QUIT":
+                    outputStream.writeUTF("BYE");
+                    return false;
+
+                default:
+                    outputStream.writeUTF("ERROR Unknown command in COMPLETE_DIAGNOSISFILE state");
+                    return true;
+            }
+        }
+
+        /* ============================ BUSINESS LOGIC STUBS ============================ */
 
         private void handleSignupDoctor() throws IOException {
             try {
@@ -1211,7 +1452,7 @@ public class ServerThread {
             }
         }
 
-
+        //TODO: when log in make loggedPatien the logged user
         private void handleLoginDoctor() throws IOException {
             try {
                 String username = inputStream.readUTF();
@@ -1262,6 +1503,67 @@ public class ServerThread {
                 outputStream.writeUTF("Login error: " + e.getMessage());
                 outputStream.flush();
             }
+        }
+
+        private void doOpenSearchPatient() throws IOException {
+            // Tell client to show search UI or ask for criteria
+            outputStream.writeUTF("SEARCH_PATIENT_OPEN");
+        }
+
+        private void doSelectPatientAndShowInfo() throws IOException {
+            // Read chosen patient from client, set selectedPatient, send info
+            // int patientId = inputStream.readInt();
+            // selectedPatient = patientDAO.findById(patientId);
+            outputStream.writeUTF("VIEW_PATIENT_INFO");
+        }
+
+        private void doViewDiagnosisFileListForPatient() throws IOException {
+            outputStream.writeUTF("DIAGNOSISFILE_LIST_FOR_PATIENT");
+        }
+
+        private void doDownloadDiagnosisFile() throws IOException {
+            outputStream.writeUTF("DOWNLOAD_DIAGNOSISFILE_STARTED");
+            // ... send data ...
+            outputStream.writeUTF("DOWNLOAD_DIAGNOSISFILE_FINISHED");
+        }
+
+        private void doViewRecordingListForDiagnosisFile() throws IOException {
+            outputStream.writeUTF("RECORDING_LIST_FOR_DIAGNOSISFILE");
+        }
+
+        private void doChangeFragment() throws IOException {
+            // int fragmentIndex = inputStream.readInt();
+            outputStream.writeUTF("FRAGMENT_CHANGED");
+        }
+
+        private void doDownloadRecording() throws IOException {
+            outputStream.writeUTF("DOWNLOAD_RECORDING_STARTED");
+            // ... send data ...
+            outputStream.writeUTF("DOWNLOAD_RECORDING_FINISHED");
+        }
+
+        private void doListRecentlyFinished() throws IOException {
+            outputStream.writeUTF("RECENTLY_FINISH_LIST");
+        }
+
+        private void doCompleteDiagnosisFileSelection() throws IOException {
+            outputStream.writeUTF("COMPLETE_DIAGNOSISFILE_READY");
+        }
+
+        private void doViewDiagnosisFileFromRecentlyFinished() throws IOException {
+            outputStream.writeUTF("VIEW_DIAGNOSISFILE_FROM_RECENTLY_FINISH");
+        }
+
+        private void doViewRecordingFromRecentlyFinished() throws IOException {
+            outputStream.writeUTF("VIEW_RECORDING_FROM_RECENTLY_FINISH");
+        }
+
+        /* ============================ CLEANUP ============================ */
+
+        private void releaseResources(DataInputStream in, Socket s, DataOutputStream out) {
+            try { if (in != null) in.close(); } catch (IOException ignored) {}
+            try { if (out != null) out.close(); } catch (IOException ignored) {}
+            try { if (s != null && !s.isClosed()) s.close(); } catch (IOException ignored) {}
         }
 
         private void handleListPatients() throws IOException {
