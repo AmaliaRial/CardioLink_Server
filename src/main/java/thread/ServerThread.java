@@ -1612,7 +1612,7 @@ public class ServerThread {
                 List<String> InsuranceNumbers= doctorMan.getAllPatientsInsuranceNumberbyDoctor(loggedDoctor.getIdDoctor());
                 String InsuranceNumbersMessage=  String.join(", ", InsuranceNumbers);
 
-                outputStream.writeUTF("InsuranceNumbersMessage");
+                outputStream.writeUTF(InsuranceNumbersMessage);
 
             } catch (SQLException e) {
                 throw new RuntimeException(e);
