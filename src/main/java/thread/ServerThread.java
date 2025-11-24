@@ -1321,7 +1321,7 @@ public class ServerThread {
                     return true;
 
                 case "VIEW_RECORDING":
-                    doViewRecordingListForDiagnosisFile();
+                    doViewRecording();
                     goTo(State.VIEW_RECORDING);       // ★2
                     return true;
 
@@ -1342,7 +1342,7 @@ public class ServerThread {
 
         // VIEW_RECORDING: shared node ★2
         // Next: CHANGE_FRAGMENT / DOWNLOAD_RECORDING / back to VIEW_DIAGNOSISFILE
-        private boolean handleViewRecordingCommand(String command) throws IOException {
+        private boolean handleView(String command) throws IOException {
             switch (command) {
                 case "CHANGE_FRAGMENT":
                     doChangeFragment();
@@ -1654,31 +1654,35 @@ public class ServerThread {
             outputStream.writeUTF("DOWNLOAD_DIAGNOSISFILE_FINISHED");
         }
 
-        private void doViewRecordingListForDiagnosisFile() throws IOException {
+        private void doViewRecording() throws IOException {
             try {
-                String df = inputStream.readUTF();
-                if(!df.isEmpty()) {
-                    int id_diagnosisFile = Integer.parseInt(df);
-                    int sequence = 1;
-                    String fragment = null;
-                    List<Boolean> states = patientMan.getSateOfFragmentsOfRecordingByID(id_diagnosisFile);
-                    while((fragment = doctorMan.getFragmentOfRecording(id_diagnosisFile,sequence)) != null){
-                        Boolean state = states.get(sequence -1);
-                        String stateString = state.toString();
+                String adreess = inputStream.readUTF();
+                if(!adreess.isEmpty()) {
+                    String[] partes = adreess.split(",");
+                    int id_diagnosisFile = Integer.parseInt(partes[0].trim());
+                    int sequence = Integer.parseInt(partes[1].trim());
+                    String fragment= doctorMan.getFragmentOfRecording(id_diagnosisFile,sequence);
+                    List<Boolean> states = doctorMan.getSateOfFragmentsOfRecordingByID(id_diagnosisFile);
 
-                        outputStream.writeUTF(fragment);
-                        outputStream.writeUTF(stateString);
+                    StringBuilder stateStringB = new StringBuilder();
 
-                        sequence++;
+                    for (Boolean state : states) {
+                        stateStringB.append(state).append(",");
                     }
+                    if (stateStringB.length() > 0) {
+                        stateStringB.deleteCharAt(stateStringB.length() - 1);
+                    }
+
+                    String stateString = stateStringB.toString();
+                    outputStream.writeUTF(fragment);
+                    outputStream.writeUTF(stateString);
+
                 }else{
                     outputStream.writeUTF("FAILED_TO_CONNET");
                 }
             } catch (SQLException e) {
                 throw new RuntimeException(e);
             }
-
-            outputStream.writeUTF("RECORDING_LIST_FOR_DIAGNOSISFILE_ENDED");
         }
 
         private void doChangeFragment() throws IOException {
