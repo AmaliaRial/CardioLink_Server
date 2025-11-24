@@ -1754,9 +1754,8 @@ public class ServerThread {
             outputStream.writeUTF("RECENTLY_FINISH_LIST");
             List<DiagnosisFile> recentDF = null;
             recentDF = doctorMan.listDiagnosisFilesTODO(loggedDoctor.getIdDoctor());
-            for(DiagnosisFile df: recentDF) {
-                outputStream.writeUTF(df.toString());
-            }
+            outputStream.writeUTF(recentDF.toString());
+
             outputStream.writeUTF("RECENTLY_FINISHED");
         }
 
