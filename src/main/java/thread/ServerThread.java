@@ -1342,7 +1342,7 @@ public class ServerThread {
 
         // VIEW_RECORDING: shared node ★2
         // Next: CHANGE_FRAGMENT / DOWNLOAD_RECORDING / back to VIEW_DIAGNOSISFILE
-        private boolean handleView(String command) throws IOException {
+        private boolean handleViewRecordingCommand(String command) throws IOException {
             switch (command) {
                 case "CHANGE_FRAGMENT":
                     doChangeFragment();
@@ -1759,11 +1759,7 @@ public class ServerThread {
         private void doListRecentlyFinished() throws IOException {
             outputStream.writeUTF("RECENTLY_FINISH_LIST");
             List<DiagnosisFile> recentDF = null;
-            try {
-                recentDF = doctorMan.listRecentDiagnosisFilesByDoctor(loggedDoctor.getIdDoctor());
-            } catch (SQLException e) {
-                throw new RuntimeException(e);
-            }
+            recentDF = doctorMan.listDiagnosisFilesTODO(loggedDoctor.getIdDoctor());
             for(DiagnosisFile df: recentDF) {
                 outputStream.writeUTF(df.toString());
             }
