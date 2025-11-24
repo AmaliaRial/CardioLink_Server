@@ -664,7 +664,7 @@ public class ServerThread {
                 String docName = patientMan.getDoctornameByPatient(loggedPatient);
                 List<DiagnosisFile> diagnosisFiles = patientMan.getAllDiagnosisFilesFromPatient(loggedPatient.getIdPatient());
                 loggedPatient.setDiagnosisList(diagnosisFiles);
-                outputStream.writeUTF(docName+","+loggedPatient.listOfDiagnosisFilesToString());
+                outputStream.writeUTF(docName+";"+loggedPatient.listOfDiagnosisFilesToString());
                 outputStream.writeUTF("PATIENT_OVERVIEW_SENT");
 
             } else {
