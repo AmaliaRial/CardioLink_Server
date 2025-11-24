@@ -141,51 +141,6 @@ public class JDBCDoctorManager implements DoctorManager {
     }
 
     @Override
-    public List<DiagnosisFile> listRecentDiagnosisFilesByDoctor(int idDoctor) throws SQLException {
-        List<DiagnosisFile> diagnosisFiles = new ArrayList<>();
-
-        String sql = "SELECT df.id, df.symptoms, df.diagnosis, df.medication, df.date, df.patientId, df.status " +
-                "FROM diagnosisFiles df " +
-                "JOIN patients p ON df.patientId = p.idPatient " +
-                "WHERE p.doctorId = ? " +
-                "ORDER BY df.date DESC " +
-                "LIMIT 5";
-
-        try (Connection c = conMan.getConnection();
-             PreparedStatement ps = c.prepareStatement(sql)) {
-
-            ps.setInt(1, idDoctor);
-
-            try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) {
-                    int id = rs.getInt("id");
-                    ArrayList<String> symptoms = new ArrayList<>();
-                    String symptomsStr = rs.getString("symptoms");
-                    if (symptomsStr != null && !symptomsStr.isEmpty()) {
-                        for (String symptom : symptomsStr.split(",")) {
-                            symptoms.add(symptom.trim());
-                        }
-                    }
-                    String diagnosis = rs.getString("diagnosis");
-                    String medication = rs.getString("medication");
-                    LocalDate date = rs.getDate("date").toLocalDate();
-                    int patientId = rs.getInt("patientId");
-                    boolean status = rs.getBoolean("status");
-
-                    DiagnosisFile diagnosisFile = new DiagnosisFile(id, symptoms, diagnosis, medication, date, patientId, status);
-                    diagnosisFiles.add(diagnosisFile);
-                }
-            }
-
-        } catch (SQLException e) {
-            System.out.println("Error retrieving recent diagnosis files from database.");
-            e.printStackTrace();
-        }
-
-        return diagnosisFiles;
-    }
-
-    @Override
     public Doctor getDoctorbyUserId(int userId) throws SQLException{
         String sql = "SELECT * FROM doctors WHERE userId = ?";
         try (Connection c = conMan.getConnection();
