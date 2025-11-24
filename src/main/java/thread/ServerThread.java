@@ -735,7 +735,6 @@ public class ServerThread {
 
                 outputStream.writeUTF(ecgString);
                 outputStream.writeUTF(edaString);
-                outputStream.writeUTF("DOWNLOAD_FINISHED");
             } catch (IOException | SQLException e) {
                 throw new RuntimeException(e);
             }
@@ -1294,7 +1293,6 @@ public class ServerThread {
         private boolean handleViewPatientCommand(String command) throws IOException {
             switch (command) {
                 case "VIEW_DIAGNOSISFILE":
-                    doViewDiagnosisFileListForPatient();
                     goTo(State.VIEW_DIAGNOSISFILE);   // ★1
                     return true;
 
@@ -1396,12 +1394,11 @@ public class ServerThread {
         private boolean handleCompleteDiagnosisFileCommand(String command) throws IOException {
             switch (command) {
                 case "VIEW_DIAGNOSISFILE":           // ★1 path
-                    doViewDiagnosisFileFromRecentlyFinished();
                     goTo(State.VIEW_DIAGNOSISFILE);
                     return true;
 
                 case "VIEW_RECORDING":               // ★2 path
-                    doViewRecordingFromRecentlyFinished();
+                    doViewRecording();
                     goTo(State.VIEW_RECORDING);
                     return true;
 
@@ -1637,9 +1634,7 @@ public class ServerThread {
             }
         }
 
-        private void doViewDiagnosisFileListForPatient() throws IOException {
-            outputStream.writeUTF("DIAGNOSISFILE_LIST_FOR_PATIENT");
-        }
+
 
         private void doDownloadDiagnosisFile() throws IOException {
             outputStream.writeUTF("DOWNLOAD_DIAGNOSISFILE_STARTED");
@@ -1651,7 +1646,6 @@ public class ServerThread {
             } catch (IOException | SQLException e) {
                 throw new RuntimeException(e);
             }
-            outputStream.writeUTF("DOWNLOAD_DIAGNOSISFILE_FINISHED");
         }
 
         private void doViewRecording() throws IOException {
@@ -1768,15 +1762,19 @@ public class ServerThread {
 
         private void doCompleteDiagnosisFileSelection() throws IOException {
             outputStream.writeUTF("COMPLETE_DIAGNOSISFILE_READY");
+            String idDF = inputStream.readUTF();
+            int idDiagnosisFile = Integer.parseInt(idDF);
+            String diagnosisString = inputStream.readUTF();
+            try {
+                DiagnosisFile diagnosisFile = doctorMan.getDiagnosisFileByID(idDiagnosisFile);
+                diagnosisFile.setDiagnosis(diagnosisString);
+                doctorMan.UpDateDiagnosisFile(diagnosisFile);
+                outputStream.writeUTF("COMPLETE_DIAGNOSISFILE_SAVED");
+            } catch (SQLException e) {
+                throw new RuntimeException(e);
+            }
         }
 
-        private void doViewDiagnosisFileFromRecentlyFinished() throws IOException {
-            outputStream.writeUTF("VIEW_DIAGNOSISFILE_FROM_RECENTLY_FINISH");
-        }
-
-        private void doViewRecordingFromRecentlyFinished() throws IOException {
-            outputStream.writeUTF("VIEW_RECORDING_FROM_RECENTLY_FINISH");
-        }
 
         /* ============================ CLEANUP ============================ */
 
