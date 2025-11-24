@@ -252,7 +252,7 @@ import java.util.List;
      }
 
      @Override
-     public String getFragmentOfRecording(int idDiagnosisFile, int position)throws SQLException {
+     public String getFragmentOfRecording(int idDiagnosisFile, int position) throws SQLException {
          String sql = "SELECT data FROM recordings WHERE diagnosisFileId = ? AND sequence = ?";
 
          try (Connection c = conMan.getConnection();  // Assuming conMan.getConnection() returns a valid DB connection
@@ -344,92 +344,144 @@ import java.util.List;
 
      @Override
      public int returnIdOfLastDiagnosisFile() throws SQLException {
-            String sql = "SELECT MAX(id) AS lastId FROM diagnosisFiles";
+         String sql = "SELECT MAX(id) AS lastId FROM diagnosisFiles";
 
-            try (Connection c = conMan.getConnection();
-                PreparedStatement ps = c.prepareStatement(sql)) {
+         try (Connection c = conMan.getConnection();
+              PreparedStatement ps = c.prepareStatement(sql)) {
 
-                ResultSet rs = ps.executeQuery();
+             ResultSet rs = ps.executeQuery();
 
-                if (rs.next()) {
-                    return rs.getInt("lastId");
-                } else {
-                    throw new SQLException("No DiagnosisFiles found in the database.");
-                }
+             if (rs.next()) {
+                 return rs.getInt("lastId");
+             } else {
+                 throw new SQLException("No DiagnosisFiles found in the database.");
+             }
 
-            } catch (SQLException e) {
-                System.out.println("Error retrieving the last DiagnosisFile ID from the database.");
-                e.printStackTrace();
-                throw e;  // Rethrow the exception after logging
-            }
+         } catch (SQLException e) {
+             System.out.println("Error retrieving the last DiagnosisFile ID from the database.");
+             e.printStackTrace();
+             throw e;  // Rethrow the exception after logging
+         }
      }
 
      @Override
      public void saveFragmentOfRecording(int idDiagnosisFile, String fragmentData) throws SQLException {
-            String sql = "INSERT INTO recordings (diagnosisFileId, data, anomaly, sequence) " +
-                    "VALUES (?, ?, ?, ?)";
+         String sql = "INSERT INTO recordings (diagnosisFileId, data, anomaly, sequence) " +
+                 "VALUES (?, ?, ?, ?)";
 
-            try (Connection c = conMan.getConnection();
-                PreparedStatement ps = c.prepareStatement(sql)) {
+         try (Connection c = conMan.getConnection();
+              PreparedStatement ps = c.prepareStatement(sql)) {
 
-                // For simplicity, let's assume 'anomaly' is false and 'sequence' is auto-incremented
-                ps.setInt(1, idDiagnosisFile);
-                ps.setString(2, fragmentData);
-                ps.setBoolean(3, false);  // Defaulting anomaly to false
+             // For simplicity, let's assume 'anomaly' is false and 'sequence' is auto-incremented
+             ps.setInt(1, idDiagnosisFile);
+             ps.setString(2, fragmentData);
+             ps.setBoolean(3, false);  // Defaulting anomaly to false
 
-                // Get the next sequence number for this diagnosisFileId
-                int nextSequence = getNextSequenceNumber(c, idDiagnosisFile);
-                ps.setInt(4, nextSequence);
+             // Get the next sequence number for this diagnosisFileId
+             int nextSequence = getNextSequenceNumber(c, idDiagnosisFile);
+             ps.setInt(4, nextSequence);
 
-                ps.executeUpdate();
-                System.out.println("Fragment of recording saved successfully.");
+             ps.executeUpdate();
+             System.out.println("Fragment of recording saved successfully.");
 
-            } catch (SQLException e) {
-                System.out.println("Error saving fragment of recording to the database.");
-                e.printStackTrace();
-            }
+         } catch (SQLException e) {
+             System.out.println("Error saving fragment of recording to the database.");
+             e.printStackTrace();
+         }
      }
-    @Override
+
+     @Override
      public int getNextSequenceNumber(Connection c, int idDiagnosisFile) {
-            String sql = "SELECT MAX(sequence) AS maxSeq FROM recordings WHERE diagnosisFileId = ?";
-            try (PreparedStatement ps = c.prepareStatement(sql)) {
-                ps.setInt(1, idDiagnosisFile);
-                ResultSet rs = ps.executeQuery();
-                if (rs.next()) {
-                    int maxSeq = rs.getInt("maxSeq");
-                    return maxSeq + 1;  // Next sequence number
-                } else {
-                    return 1;  // Start from 1 if no records exist
-                }
-            } catch (SQLException e) {
-                System.out.println("Error retrieving next sequence number from the database.");
-                e.printStackTrace();
-                return 1;  // Default to 1 in case of error
-            }
+         String sql = "SELECT MAX(sequence) AS maxSeq FROM recordings WHERE diagnosisFileId = ?";
+         try (PreparedStatement ps = c.prepareStatement(sql)) {
+             ps.setInt(1, idDiagnosisFile);
+             ResultSet rs = ps.executeQuery();
+             if (rs.next()) {
+                 int maxSeq = rs.getInt("maxSeq");
+                 return maxSeq + 1;  // Next sequence number
+             } else {
+                 return 1;  // Start from 1 if no records exist
+             }
+         } catch (SQLException e) {
+             System.out.println("Error retrieving next sequence number from the database.");
+             e.printStackTrace();
+             return 1;  // Default to 1 in case of error
+         }
      }
 
      @Override
      public void updateSymptomsInDiagnosisFile(int idDiagnosisFile, String selectedSymptoms) {
-            String sql = "UPDATE diagnosisFiles SET symptoms = ? WHERE id = ?";
+         String sql = "UPDATE diagnosisFiles SET symptoms = ? WHERE id = ?";
 
-            try (Connection c = conMan.getConnection();
-                PreparedStatement ps = c.prepareStatement(sql)) {
+         try (Connection c = conMan.getConnection();
+              PreparedStatement ps = c.prepareStatement(sql)) {
 
-                ps.setString(1, selectedSymptoms);
-                ps.setInt(2, idDiagnosisFile);
+             ps.setString(1, selectedSymptoms);
+             ps.setInt(2, idDiagnosisFile);
 
-                int rowsAffected = ps.executeUpdate();
-                if (rowsAffected > 0) {
-                    System.out.println("Symptoms updated successfully for DiagnosisFile ID: " + idDiagnosisFile);
-                } else {
-                    System.out.println("No DiagnosisFile found with ID: " + idDiagnosisFile);
-                }
+             int rowsAffected = ps.executeUpdate();
+             if (rowsAffected > 0) {
+                 System.out.println("Symptoms updated successfully for DiagnosisFile ID: " + idDiagnosisFile);
+             } else {
+                 System.out.println("No DiagnosisFile found with ID: " + idDiagnosisFile);
+             }
 
-            } catch (SQLException e) {
-                System.out.println("Error updating symptoms in DiagnosisFile.");
-                e.printStackTrace();
-            }
+         } catch (SQLException e) {
+             System.out.println("Error updating symptoms in DiagnosisFile.");
+             e.printStackTrace();
+         }
      }
+
+     @Override
+     public String getDoctornameByPatient(Patient loggedPatient) {
+         String sql = "SELECT nameDoctor + surnameDoctor FROM doctors WHERE idDoctor = ?";
+         try (Connection c = conMan.getConnection();
+             PreparedStatement ps = c.prepareStatement(sql)) {
+             int docID = loggedPatient.getDoctorId();
+
+             ps.setInt(1, docID);
+             ResultSet rs = ps.executeQuery();
+
+             if (rs.next()) {
+                 return rs.getString("nameDoctor");
+             } else {
+                 throw new SQLException("No Doctor assigned");
+             }
+
+         } catch (SQLException e) {
+             System.out.println("Error selecting doctor name.");
+             e.printStackTrace();
+             return null;
+         }
+     }
+     @Override
+     public List<String> getAllFragmentsOfRecording(int id_DiagnosisFile) throws SQLException {
+         List<String> fragments = new ArrayList<>();
+
+         String sql = "SELECT data FROM recordings WHERE diagnosisFileId = ? ORDER BY sequence ASC";
+
+         try (Connection c = conMan.getConnection();
+              PreparedStatement ps = c.prepareStatement(sql)) {
+
+             ps.setInt(1, id_DiagnosisFile);
+
+             try (ResultSet rs = ps.executeQuery()) {
+
+                 while (rs.next()) {
+                     String fragment = rs.getString("data");
+                     fragments.add(fragment);
+                 }
+
+             }
+
+         } catch (SQLException e) {
+             System.out.println("Error getting fragments of recording.");
+             e.printStackTrace();
+         }
+
+         return fragments;
+     }
+
 
 
  }

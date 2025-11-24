@@ -18,4 +18,6 @@ public interface PatientManager {
     void saveFragmentOfRecording(int idDiagnosisFile, String fragmentData)throws SQLException;
     int getNextSequenceNumber(Connection c, int idDiagnosisFile);
     void updateSymptomsInDiagnosisFile(int idDiagnosisFile, String selectedSymptoms);
+    String getDoctornameByPatient(Patient loggedPatient);
+    List<String> getAllFragmentsOfRecording(int id_DiagnosisFile) throws SQLException;
 }

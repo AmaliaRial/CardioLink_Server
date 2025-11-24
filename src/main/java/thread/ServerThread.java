@@ -27,6 +27,7 @@ import org.springframework.security.crypto.bcrypt.BCrypt;
 import pojos.enums.Sex;
 
 import javax.print.Doc;
+import javax.swing.*;
 
 public class ServerThread {
 
@@ -450,8 +451,8 @@ public class ServerThread {
             switch (command) {
                 case "VIEW_DIAGNOSIS_FILE":
                     // You probably want some selection logic:
-                    // handleViewDiagnosisFileList(loggedPatient.getIdPatient());
-                    handleViewDiagnosisFileList();
+                    // handleViewDiagnosisFile(loggedPatient.getIdPatient());
+
                     state = State.VIEW_DIAGNOSIS_FILE;
                     return true;
 
@@ -476,7 +477,7 @@ public class ServerThread {
             switch (command) {
                 case "VIEW_RECORDING":
                     // handleViewRecordingList(selectedDiagnosisFileId);
-                    handleViewRecordingList();
+                    handleViewRecording();
                     state = State.VIEW_RECORDING;
                     return true;
 
@@ -668,36 +669,115 @@ public class ServerThread {
         private void handleViewPatientOverview() throws IOException {
             // Send basic info about loggedPatient to client
             if (loggedPatient != null) {
-                outputStream.writeUTF(loggedPatient.toString());
+                String docName = patientMan.getDoctornameByPatient(loggedPatient);
+                List<DiagnosisFile> diagnosisFiles = patientMan.getAllDiagnosisFilesFromPatient(loggedPatient.getIdPatient());
+                loggedPatient.setDiagnosisList(diagnosisFiles);
+                outputStream.writeUTF(docName+";"+loggedPatient.listOfDiagnosisFilesToString());
+                outputStream.writeUTF("PATIENT_OVERVIEW_SENT");
+
             } else {
-                outputStream.writeUTF("ERROR No patient logged in");
+                outputStream.writeUTF("ERROR: No patient logged in");
             }
         }
 
-        private void handleViewDiagnosisFileList() throws IOException {
-            // Query diagnosis files for loggedPatient and send them to client
-            outputStream.writeUTF("DIAGNOSIS_FILE_LIST ...");
-        }
+        private void handleViewRecording() throws IOException {
+            try {
+                String adreess = inputStream.readUTF();
+                if(!adreess.isEmpty()) {
+                    String[] partes = adreess.split(",");
+                    int id_diagnosisFile = Integer.parseInt(partes[0].trim());
+                    int sequence = Integer.parseInt(partes[1].trim());
+                    String fragment= patientMan.getFragmentOfRecording(id_diagnosisFile,sequence);
+                    List<Boolean> states = patientMan.getSateOfFragmentsOfRecordingByID(id_diagnosisFile);
 
-        private void handleViewRecordingList() throws IOException {
-            // Query recordings for selected diagnosis file and send to client
-            outputStream.writeUTF("RECORDING_LIST ...");
+                    StringBuilder stateStringB = new StringBuilder();
+
+                    for (Boolean state : states) {
+                        stateStringB.append(state).append(",");
+                    }
+                    if (stateStringB.length() > 0) {
+                        stateStringB.deleteCharAt(stateStringB.length() - 1);
+                    }
+
+                    String stateString = stateStringB.toString();
+                    outputStream.writeUTF(fragment);
+                    outputStream.writeUTF(stateString);
+
+                }else{
+                    outputStream.writeUTF("FAILED_TO_CONNET");
+                }
+            } catch (SQLException e) {
+                throw new RuntimeException(e);
+            }
         }
 
         private void handleChangeFragment() throws IOException {
-            // Read fragment index from client, send fragment data, etc.
-            // Example:
-            // int fragmentIndex = inputStream.readInt();
-            // send fragment for given recording
+            try {
+                String adreess = inputStream.readUTF();
+                if(!adreess.isEmpty()) {
+                    String[] partes = adreess.split(",");
+                    int id_diagnosisFile = Integer.parseInt(partes[0].trim());
+                    int sequence = Integer.parseInt(partes[1].trim());
+                    String fragment= patientMan.getFragmentOfRecording(id_diagnosisFile,sequence);
+
+                    outputStream.writeUTF(fragment);
+
+                }else{
+                    outputStream.writeUTF("FAILED_TO_CONNET");
+                }
+            } catch (SQLException e) {
+                throw new RuntimeException(e);
+            }
             outputStream.writeUTF("FRAGMENT_CHANGED");
         }
 
-        private void handleDownloadRecording() throws IOException {
-            // Send full recording to client (e.g. as binary or chunked)
-            outputStream.writeUTF("DOWNLOAD_STARTED");
-            // ... stream data ...
-            outputStream.writeUTF("DOWNLOAD_FINISHED");
+        private void handleDownloadRecording() {
+            try {
+                String idDiagnosisFile = inputStream.readUTF();
+                outputStream.writeUTF("SENDING_RECORDING");
+                List<String> fragmentList= patientMan.getAllFragmentsOfRecording(Integer.parseInt(idDiagnosisFile));
+
+                String[] signals = joinFragmentsAsStrings(fragmentList);
+                String ecgString = signals[0];
+                String edaString = signals[1];
+
+                outputStream.writeUTF(ecgString);
+                outputStream.writeUTF(edaString);
+            } catch (IOException | SQLException e) {
+                throw new RuntimeException(e);
+            }
         }
+
+        public String[] joinFragmentsAsStrings(List<String> fragments) {
+
+            StringBuilder ecgBuilder = new StringBuilder();
+            StringBuilder edaBuilder = new StringBuilder();
+
+            for (String fragment : fragments) {
+                // fragment tiene formato "ecg1,ecg2,...;eda1,eda2,..."
+                String[] parts = fragment.split(";");
+                String ecgPart = parts[0].trim();
+                String edaPart = parts[1].trim();
+
+                ecgBuilder.append(ecgPart).append(",");
+                edaBuilder.append(edaPart).append(",");
+            }
+
+            // Quitar la última coma si existe
+            if (ecgBuilder.length() > 0) {
+                ecgBuilder.deleteCharAt(ecgBuilder.length() - 1);
+            }
+            if (edaBuilder.length() > 0) {
+                edaBuilder.deleteCharAt(edaBuilder.length() - 1);
+            }
+
+            String ecgString = ecgBuilder.toString();
+            String edaString = edaBuilder.toString();
+
+            // [0] = ECG, [1] = EDA
+            return new String[] { ecgString, edaString };
+        }
+
 
         /* ============================ RESOURCE CLEANUP ============================ */
 
@@ -1221,7 +1301,6 @@ public class ServerThread {
         private boolean handleViewPatientCommand(String command) throws IOException {
             switch (command) {
                 case "VIEW_DIAGNOSISFILE":
-                    doViewDiagnosisFileListForPatient();
                     goTo(State.VIEW_DIAGNOSISFILE);   // ★1
                     return true;
 
@@ -1248,7 +1327,7 @@ public class ServerThread {
                     return true;
 
                 case "VIEW_RECORDING":
-                    doViewRecordingListForDiagnosisFile();
+                    doViewRecording();
                     goTo(State.VIEW_RECORDING);       // ★2
                     return true;
 
@@ -1323,12 +1402,11 @@ public class ServerThread {
         private boolean handleCompleteDiagnosisFileCommand(String command) throws IOException {
             switch (command) {
                 case "VIEW_DIAGNOSISFILE":           // ★1 path
-                    doViewDiagnosisFileFromRecentlyFinished();
                     goTo(State.VIEW_DIAGNOSISFILE);
                     return true;
 
                 case "VIEW_RECORDING":               // ★2 path
-                    doViewRecordingFromRecentlyFinished();
+                    doViewRecording();
                     goTo(State.VIEW_RECORDING);
                     return true;
 
@@ -1538,57 +1616,172 @@ public class ServerThread {
         }
 
         private void doOpenSearchPatient() throws IOException {
-            // Tell client to show search UI or ask for criteria
-            outputStream.writeUTF("SEARCH_PATIENT_OPEN");
+            try {
+                List<String> InsuranceNumbers= doctorMan.getAllPatientsInsuranceNumberbyDoctor(loggedDoctor.getIdDoctor());
+                String InsuranceNumbersMessage=  String.join(", ", InsuranceNumbers);
+
+                outputStream.writeUTF("InsuranceNumbersMessage");
+
+            } catch (SQLException e) {
+                throw new RuntimeException(e);
+            }
         }
 
         private void doSelectPatientAndShowInfo() throws IOException {
+            try {
             // Read chosen patient from client, set selectedPatient, send info
-            // int patientId = inputStream.readInt();
-            // selectedPatient = patientDAO.findById(patientId);
-            outputStream.writeUTF("VIEW_PATIENT_INFO");
+                int PatientHIN = inputStream.readInt();
+                Patient selectedPatient = doctorMan.getPatientByHIN(PatientHIN);
+                List<DiagnosisFile> diagnosisFiles = doctorMan.getAllDiagnosisFilesFromPatient(selectedPatient.getIdPatient());
+                selectedPatient.setDiagnosisList(diagnosisFiles);
+                outputStream.writeUTF("PATIENT_OVERVIEW_SENT");
+                outputStream.writeUTF(selectedPatient.toString());
+
+            } catch (SQLException e) {
+                throw new RuntimeException(e);
+            }
         }
 
-        private void doViewDiagnosisFileListForPatient() throws IOException {
-            outputStream.writeUTF("DIAGNOSISFILE_LIST_FOR_PATIENT");
-        }
+
 
         private void doDownloadDiagnosisFile() throws IOException {
             outputStream.writeUTF("DOWNLOAD_DIAGNOSISFILE_STARTED");
-            // ... send data ...
-            outputStream.writeUTF("DOWNLOAD_DIAGNOSISFILE_FINISHED");
+            try{
+                String idDiagnosisFile = inputStream.readUTF();
+                int idDF = Integer.parseInt(idDiagnosisFile);
+                DiagnosisFile diagnosisFile = doctorMan.getDiagnosisFileByID(idDF);
+                outputStream.writeUTF(diagnosisFile.toString());
+            } catch (IOException | SQLException e) {
+                throw new RuntimeException(e);
+            }
         }
 
-        private void doViewRecordingListForDiagnosisFile() throws IOException {
-            outputStream.writeUTF("RECORDING_LIST_FOR_DIAGNOSISFILE");
+        private void doViewRecording() throws IOException {
+            try {
+                String adreess = inputStream.readUTF();
+                if(!adreess.isEmpty()) {
+                    String[] partes = adreess.split(",");
+                    int id_diagnosisFile = Integer.parseInt(partes[0].trim());
+                    int sequence = Integer.parseInt(partes[1].trim());
+                    String fragment= doctorMan.getFragmentOfRecording(id_diagnosisFile,sequence);
+                    List<Boolean> states = doctorMan.getSateOfFragmentsOfRecordingByID(id_diagnosisFile);
+
+                    StringBuilder stateStringB = new StringBuilder();
+
+                    for (Boolean state : states) {
+                        stateStringB.append(state).append(",");
+                    }
+                    if (stateStringB.length() > 0) {
+                        stateStringB.deleteCharAt(stateStringB.length() - 1);
+                    }
+
+                    String stateString = stateStringB.toString();
+                    outputStream.writeUTF(fragment);
+                    outputStream.writeUTF(stateString);
+
+                }else{
+                    outputStream.writeUTF("FAILED_TO_CONNET");
+                }
+            } catch (SQLException e) {
+                throw new RuntimeException(e);
+            }
         }
 
         private void doChangeFragment() throws IOException {
-            // int fragmentIndex = inputStream.readInt();
+            try {
+                String adreess = inputStream.readUTF();
+                if(!adreess.isEmpty()) {
+                    String[] partes = adreess.split(",");
+                    int id_diagnosisFile = Integer.parseInt(partes[0].trim());
+                    int sequence = Integer.parseInt(partes[1].trim());
+                    String fragment= doctorMan.getFragmentOfRecording(id_diagnosisFile,sequence);
+
+                    outputStream.writeUTF(fragment);
+
+                }else{
+                    outputStream.writeUTF("FAILED_TO_CONNET");
+                }
+            } catch (SQLException e) {
+                throw new RuntimeException(e);
+            }
             outputStream.writeUTF("FRAGMENT_CHANGED");
         }
 
         private void doDownloadRecording() throws IOException {
-            outputStream.writeUTF("DOWNLOAD_RECORDING_STARTED");
-            // ... send data ...
+            try {
+                String idDiagnosisFile = inputStream.readUTF();
+                int idDF = Integer.parseInt(idDiagnosisFile);
+                outputStream.writeUTF("DOWNLOAD_RECORDING_STARTED");
+                List<String> fragmentList = doctorMan.getAllFragmentsOfRecording(idDF);
+                List<Boolean> stateList = doctorMan.getSateOfFragmentsOfRecordingByID(idDF);
+
+                String[] signals = joinFragmentsAsStrings(fragmentList);
+                String ecgString = signals[0];
+                String edaString = signals[1];
+
+                outputStream.writeUTF(ecgString);
+                outputStream.writeUTF(edaString);
+                outputStream.writeUTF("DOWNLOAD_FINISHED");
+            } catch (IOException | SQLException e) {
+                throw new RuntimeException(e);
+            }
             outputStream.writeUTF("DOWNLOAD_RECORDING_FINISHED");
+        }
+
+        public String[] joinFragmentsAsStrings(List<String> fragments) {
+
+            StringBuilder ecgBuilder = new StringBuilder();
+            StringBuilder edaBuilder = new StringBuilder();
+
+            for (String fragment : fragments) {
+                // fragment tiene formato "ecg1,ecg2,...;eda1,eda2,..."
+                String[] parts = fragment.split(";");
+                String ecgPart = parts[0].trim();
+                String edaPart = parts[1].trim();
+
+                ecgBuilder.append(ecgPart).append(",");
+                edaBuilder.append(edaPart).append(",");
+            }
+
+            // Quitar la última coma si existe
+            if (ecgBuilder.length() > 0) {
+                ecgBuilder.deleteCharAt(ecgBuilder.length() - 1);
+            }
+            if (edaBuilder.length() > 0) {
+                edaBuilder.deleteCharAt(edaBuilder.length() - 1);
+            }
+
+            String ecgString = ecgBuilder.toString();
+            String edaString = edaBuilder.toString();
+
+            // [0] = ECG, [1] = EDA
+            return new String[] { ecgString, edaString };
         }
 
         private void doListRecentlyFinished() throws IOException {
             outputStream.writeUTF("RECENTLY_FINISH_LIST");
+            List<DiagnosisFile> recentDF = null;
+            recentDF = doctorMan.listDiagnosisFilesTODO(loggedDoctor.getIdDoctor());
+            outputStream.writeUTF(recentDF.toString());
+
+            outputStream.writeUTF("RECENTLY_FINISHED");
         }
 
         private void doCompleteDiagnosisFileSelection() throws IOException {
             outputStream.writeUTF("COMPLETE_DIAGNOSISFILE_READY");
+            String idDF = inputStream.readUTF();
+            int idDiagnosisFile = Integer.parseInt(idDF);
+            String diagnosisString = inputStream.readUTF();
+            try {
+                DiagnosisFile diagnosisFile = doctorMan.getDiagnosisFileByID(idDiagnosisFile);
+                diagnosisFile.setDiagnosis(diagnosisString);
+                doctorMan.UpDateDiagnosisFile(diagnosisFile);
+                outputStream.writeUTF("COMPLETE_DIAGNOSISFILE_SAVED");
+            } catch (SQLException e) {
+                throw new RuntimeException(e);
+            }
         }
 
-        private void doViewDiagnosisFileFromRecentlyFinished() throws IOException {
-            outputStream.writeUTF("VIEW_DIAGNOSISFILE_FROM_RECENTLY_FINISH");
-        }
-
-        private void doViewRecordingFromRecentlyFinished() throws IOException {
-            outputStream.writeUTF("VIEW_RECORDING_FROM_RECENTLY_FINISH");
-        }
 
         /* ============================ CLEANUP ============================ */
 
@@ -1782,7 +1975,7 @@ public class ServerThread {
                 // 2) Obtener el fragmento desde la BD usando el doctorManager
                 String fragmentData;
                 try {
-                    fragmentData = doctorMan.getFracmentofRecoring(idDiagnosisFile, position);
+                    fragmentData = doctorMan.getFragmentOfRecording(idDiagnosisFile, position);
                 } catch (SQLException e) {
                     System.out.println("SQL error while retrieving recording fragment.");
                     e.printStackTrace();

@@ -18,9 +18,12 @@ public interface DoctorManager {
     List<DiagnosisFile> listDiagnosisFilesTODO(int idDoctor);
     List<DiagnosisFile>  getAllDiagnosisFilesFromPatient(int idPatient);
     void UpDateDiagnosisFile(DiagnosisFile diagnosisfile)throws SQLException;
-    String getFracmentofRecoring(int idDiagnosisFile, int position)throws SQLException ;
+    String getFragmentOfRecording(int idDiagnosisFile, int position)throws SQLException ;
     List<Boolean> getSateOfFragmentsOfRecordingByID(int idDiagnosisFile)throws SQLException;
     void addDoctor(Doctor doctor) throws SQLException;
+    List<String> getAllPatientsInsuranceNumberbyDoctor(int idDoctor)throws SQLException;
+    List<String> getAllFragmentsOfRecording(int id_DiagnosisFile) throws SQLException;
+    DiagnosisFile getDiagnosisFileByID(int idDiagnosisFile) throws SQLException;
 
 }
 
