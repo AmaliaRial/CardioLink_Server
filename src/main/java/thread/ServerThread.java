@@ -1143,14 +1143,16 @@ public class ServerThread {
                     if (command.isEmpty()) {
                         continue;
                     }
-
+                    System.out.printf(command);
                     switch (currentState()) {
                         case AUTH:
                             running = handleAuthCommand(command);
+                            System.out.println(currentState());
                             break;
 
                         case DOCTOR_MENU:
                             running = handleDoctorMenuCommand(command);
+                            System.out.println(currentState());
                             break;
 
                         case SEARCH_PATIENT:
@@ -1269,9 +1271,9 @@ public class ServerThread {
                     goTo(State.RECENTLY_FINISH);  // next "BACK" will return here
                     return true;
 
-                case "BACK_TO_MENU":
+                case "LOG_OUT":
                     // already at menu – optionally go back to AUTH:
-                    // goBack();
+                    goBack();
                     return true;
 
                 case "QUIT":
