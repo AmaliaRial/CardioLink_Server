@@ -378,7 +378,16 @@ public class ServerThread {
         private boolean handleAuthCommand(String command) throws Exception {
             switch (command) {
                 case "SIGNUP":
-                    handleSignup(); // you implement this
+                    handleSignup();
+                         // implement to return Patient or null
+                    if (loggedPatient != null) {
+                        // Login OK: go to main menu
+                        state = State.MAIN_MENU;
+                        outputStream.writeUTF("LOGIN_OK");
+                    } else {
+                        // Login failed
+                        outputStream.writeUTF("SIGNUP_FAILED");
+                    }// you implement this
                     return true;   // keep connection open
 
                 case "LOGIN":
@@ -1212,6 +1221,12 @@ public class ServerThread {
                 case "SIGNUP":
                 case "SIGN_UP":
                     handleSignupDoctor();
+                    if (this.loggedDoctor != null) {
+                        goTo(State.DOCTOR_MENU);
+                        outputStream.writeUTF("SIGNUP_OK");
+                    } else {
+                        outputStream.writeUTF("SIGNUP_FAILED");
+                    }
                     return true;
 
                 case "LOGIN":
@@ -1519,6 +1534,8 @@ public class ServerThread {
 
                             psDoc.executeUpdate();
                         }
+                        loggedDoctor= doctorMan.getDoctorbyUserId(newUserId);
+                        loggedDoctorId=loggedDoctor.getIdDoctor();
 
                         c.commit();
                         outputStream.writeUTF("ACK");
@@ -1586,6 +1603,7 @@ public class ServerThread {
                         if (rs.next()) {
                             loggedDoctorUserId = u.getIdUser();
                             loggedDoctorId = rs.getInt("idDoctor");
+                            loggedDoctor= doctorMan.getDoctorbyUserId(loggedDoctorUserId);
                             outputStream.writeBoolean(true);
                             outputStream.writeUTF("Login successful. Welcome doctor " + username);
                         } else {
@@ -1754,6 +1772,7 @@ public class ServerThread {
             outputStream.writeUTF("RECENTLY_FINISH_LIST");
             List<DiagnosisFile> recentDF = null;
             recentDF = doctorMan.listDiagnosisFilesTODO(loggedDoctor.getIdDoctor());
+
             outputStream.writeUTF(recentDF.toString());
 
             outputStream.writeUTF("RECENTLY_FINISHED");
