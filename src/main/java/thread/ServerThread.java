@@ -436,7 +436,7 @@ public class ServerThread {
                     System.out.println("patient wants to log out");
                     loggedPatient = null;
                     state = State.AUTH;
-                    outputStream.writeUTF("LOGGED_OUT");
+                   // outputStream.writeUTF("LOGGED_OUT");
                     return true;
 
                 case "QUIT":
