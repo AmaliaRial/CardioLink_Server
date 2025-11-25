@@ -320,10 +320,12 @@ public class ServerThread {
                     switch (state) {
                         case AUTH:
                             running = handleAuthCommand(command);
+                            System.out.println(state);
                             break;
 
                         case MAIN_MENU:
                             running = handleMainMenuCommand(command);
+                            System.out.println(state);
                             break;
 
                         case VIEW_PATIENT:
@@ -421,6 +423,7 @@ public class ServerThread {
                     return true;
 
                 case "LOG_OUT":
+                    System.out.println("Patient " + loggedPatient.getNamePatient() + " logged out.");
                     loggedPatient = null;
                     state = State.AUTH;
                     outputStream.writeUTF("LOGGED_OUT");
