@@ -316,6 +316,7 @@ public class ServerThread {
                     if (command.isEmpty()) {
                         continue;
                     }
+                    System.out.println(command);
 
                     switch (state) {
                         case AUTH:
@@ -380,7 +381,16 @@ public class ServerThread {
         private boolean handleAuthCommand(String command) throws Exception {
             switch (command) {
                 case "SIGNUP":
-                    handleSignup(); // you implement this
+                    handleSignup();
+                         // implement to return Patient or null
+                    if (loggedPatient != null) {
+                        // Login OK: go to main menu
+                        state = State.MAIN_MENU;
+                        outputStream.writeUTF("LOGIN_OK");
+                    } else {
+                        // Login failed
+                        outputStream.writeUTF("SIGNUP_FAILED");
+                    }// you implement this
                     return true;   // keep connection open
 
                 case "LOGIN":
@@ -423,7 +433,7 @@ public class ServerThread {
                     return true;
 
                 case "LOG_OUT":
-                    System.out.println("Patient " + loggedPatient.getNamePatient() + " logged out.");
+                    System.out.println("patient wants to log out");
                     loggedPatient = null;
                     state = State.AUTH;
                     outputStream.writeUTF("LOGGED_OUT");
@@ -1115,6 +1125,7 @@ public class ServerThread {
             this.patientMan = new JDBCPatientManager(conMan);
             this.doctorMan = new JDBCDoctorManager(conMan);
             this.userMan = new JDBCUserManager(conMan);
+            stateStack.push(State.AUTH);
         }
 
         @Override
@@ -1215,6 +1226,12 @@ public class ServerThread {
                 case "SIGNUP":
                 case "SIGN_UP":
                     handleSignupDoctor();
+                    if (this.loggedDoctor != null) {
+                        goTo(State.DOCTOR_MENU);
+                        outputStream.writeUTF("SIGNUP_OK");
+                    } else {
+                        outputStream.writeUTF("SIGNUP_FAILED");
+                    }
                     return true;
 
                 case "LOGIN":
@@ -1522,8 +1539,9 @@ public class ServerThread {
 
                             psDoc.executeUpdate();
                         }
-
                         c.commit();
+                        loggedDoctor= doctorMan.getDoctorbyUserId(newUserId);
+                        loggedDoctorId=loggedDoctor.getIdDoctor();
                         outputStream.writeUTF("ACK");
                         outputStream.writeUTF("Doctor sign up successful. You can log in now.");
                         outputStream.flush();
@@ -1557,7 +1575,6 @@ public class ServerThread {
             }
         }
 
-        //TODO: when log in make loggedPatien the logged user
         private void handleLoginDoctor() throws IOException {
             try {
                 String username = inputStream.readUTF();
@@ -1589,6 +1606,7 @@ public class ServerThread {
                         if (rs.next()) {
                             loggedDoctorUserId = u.getIdUser();
                             loggedDoctorId = rs.getInt("idDoctor");
+                            loggedDoctor= doctorMan.getDoctorbyUserId(loggedDoctorUserId);
                             outputStream.writeBoolean(true);
                             outputStream.writeUTF("Login successful. Welcome doctor " + username);
                         } else {
@@ -1612,10 +1630,10 @@ public class ServerThread {
 
         private void doOpenSearchPatient() throws IOException {
             try {
-                List<String> InsuranceNumbers= doctorMan.getAllPatientsInsuranceNumberbyDoctor(loggedDoctor.getIdDoctor());
+                List<String> InsuranceNumbers= doctorMan.getAllPatientsInsuranceNumberbyDoctor();
                 String InsuranceNumbersMessage=  String.join(", ", InsuranceNumbers);
 
-                outputStream.writeUTF("InsuranceNumbersMessage");
+                outputStream.writeUTF(InsuranceNumbersMessage);
 
             } catch (SQLException e) {
                 throw new RuntimeException(e);
@@ -1756,7 +1774,8 @@ public class ServerThread {
         private void doListRecentlyFinished() throws IOException {
             outputStream.writeUTF("RECENTLY_FINISH_LIST");
             List<DiagnosisFile> recentDF = null;
-            recentDF = doctorMan.listDiagnosisFilesTODO(loggedDoctor.getIdDoctor());
+            recentDF = doctorMan.listDiagnosisFilesTODO();
+
             outputStream.writeUTF(recentDF.toString());
 
             outputStream.writeUTF("RECENTLY_FINISHED");
@@ -1944,7 +1963,7 @@ public class ServerThread {
             try {
                 outputStream = new DataOutputStream(socket.getOutputStream());
 
-                List<DiagnosisFile> diagnosisFilesTODO = doctorMan.listDiagnosisFilesTODO(idDoctor);
+                List<DiagnosisFile> diagnosisFilesTODO = doctorMan.listDiagnosisFilesTODO();
 
                 // Si no hay archivos recientemente terminados, notificar al cliente
                 if (diagnosisFilesTODO.isEmpty()) {

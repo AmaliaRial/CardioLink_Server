@@ -15,13 +15,13 @@ public interface DoctorManager {
     Doctor getDoctorbyUserId(int userId) throws SQLException;
 
     void downloadFileInComputer(DiagnosisFile diagnosisFile) throws IOException;
-    List<DiagnosisFile> listDiagnosisFilesTODO(int idDoctor);
+    List<DiagnosisFile> listDiagnosisFilesTODO();
     List<DiagnosisFile>  getAllDiagnosisFilesFromPatient(int idPatient);
     void UpDateDiagnosisFile(DiagnosisFile diagnosisfile)throws SQLException;
     String getFragmentOfRecording(int idDiagnosisFile, int position)throws SQLException ;
     List<Boolean> getSateOfFragmentsOfRecordingByID(int idDiagnosisFile)throws SQLException;
     void addDoctor(Doctor doctor) throws SQLException;
-    List<String> getAllPatientsInsuranceNumberbyDoctor(int idDoctor)throws SQLException;
+    List<String> getAllPatientsInsuranceNumberbyDoctor()throws SQLException;
     List<String> getAllFragmentsOfRecording(int id_DiagnosisFile) throws SQLException;
     DiagnosisFile getDiagnosisFileByID(int idDiagnosisFile) throws SQLException;
 

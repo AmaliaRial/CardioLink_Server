@@ -52,17 +52,15 @@ public class JDBCDoctorManager implements DoctorManager {
     }
 
     @Override
-    public List<String> getAllPatientsInsuranceNumberbyDoctor(int idDoctor) throws SQLException {
+    public List<String> getAllPatientsInsuranceNumberbyDoctor() throws SQLException {
         List<String> insuranceNumbers = new ArrayList<>();
 
         String sql = "SELECT healthInsuranceNumberPatient " +
-                "FROM patients " +
-                "WHERE doctorId = ?";
+                "FROM patients ";
 
         try (Connection c = conMan.getConnection();
              PreparedStatement ps = c.prepareStatement(sql)) {
 
-            ps.setInt(1, idDoctor);
 
             try (ResultSet rs = ps.executeQuery()) {
 
@@ -389,16 +387,15 @@ public class JDBCDoctorManager implements DoctorManager {
     }
 */
     @Override
-    public List<DiagnosisFile> listDiagnosisFilesTODO(int idDoctor) {
+    public List<DiagnosisFile> listDiagnosisFilesTODO() {
         List<DiagnosisFile> diagnosisFiles = new ArrayList<>();
 
         String sql = "SELECT df.id, df.symptoms, df.diagnosis, df.medication, df.date, df.patientId, df.status " +
                 "FROM diagnosisFiles df " +
                 "JOIN patients p ON df.patientId = p.id " +
-                "WHERE df.status = FALSE AND p.doctorId = ?";
+                "WHERE df.status = FALSE";
 
         try (PreparedStatement ps = c.prepareStatement(sql)) {
-            ps.setInt(1, idDoctor);
 
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
