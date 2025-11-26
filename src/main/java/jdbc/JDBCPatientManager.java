@@ -344,7 +344,7 @@ import java.util.List;
 
      @Override
      public int returnIdOfLastDiagnosisFile() throws SQLException {
-         String sql = "SELECT MAX(id) AS lastId FROM diagnosisFiles";
+         String sql = "SELECT MAX(idDiagnosisFile) AS lastId FROM diagnosisFiles";
 
          try (Connection c = conMan.getConnection();
               PreparedStatement ps = c.prepareStatement(sql)) {

@@ -318,7 +318,7 @@ public class ServerThread {
                 boolean running = true;
 
                 while (running && !socket.isClosed()) {
-
+                    System.out.println(state);
                     String command = readCommand();
                     if (command == null) { // client disconnected
                         break;
@@ -330,7 +330,7 @@ public class ServerThread {
                         continue;
                     }
                     System.out.println(command);
-
+                    System.out.println(command+"#");
                     switch (state) {
                         case AUTH:
                             running = handleAuthCommand(command);
@@ -668,18 +668,23 @@ public class ServerThread {
                 patientMan.AddNewDiagnosisFile(df);
                 df.setId(patientMan.returnIdOfLastDiagnosisFile());
                 outputStream.writeUTF("READY_TO_RECORD");
+                outputStream.flush();
                 String message= inputStream.readUTF();
+
                 if (!message.equals("STOP")) {
                     patientMan.saveFragmentOfRecording(df.getId(), message);
                 } else if(message.equals("STOP")){
                     handleEndOfRecording();
                     outputStream.writeUTF("RECORDING_STOP");
+                    outputStream.flush();
 
                     outputStream.writeUTF("SELECT_SYMPTOMS");
+                    outputStream.flush();
                     String selectedSymptoms = inputStream.readUTF();
                     if (selectedSymptoms != null && !selectedSymptoms.isEmpty()) {
                         patientMan.updateSymptomsInDiagnosisFile(df.getId(), selectedSymptoms);
                         outputStream.writeUTF("SYMPTOMS_RECEIVED");
+                        outputStream.flush();
                     }
 
                 }

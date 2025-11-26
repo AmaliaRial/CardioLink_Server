@@ -14,8 +14,13 @@ public class DiagnosisFile {
 
     public DiagnosisFile(int id) {
         this.date=LocalDate.now();
-        this.id = id;
+        this.patientId = id;
         this.status=false;
+        this.symptoms=null;
+        this.diagnosis=null;
+        this.medication=null;
+
+
 
     }
     public DiagnosisFile() {
