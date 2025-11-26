@@ -1153,7 +1153,7 @@ public class ServerThread {
                 boolean running = true;
 
                 while (running && !socket.isClosed()) {
-
+                    System.out.println(currentState());
                     String command = readCommand();
                     if (command == null) {
                         break; // client disconnected
@@ -1162,16 +1162,14 @@ public class ServerThread {
                     if (command.isEmpty()) {
                         continue;
                     }
-                    System.out.printf(command);
+                    System.out.printf(command+"#");
                     switch (currentState()) {
                         case AUTH:
                             running = handleAuthCommand(command);
-                            System.out.println(currentState());
                             break;
 
                         case DOCTOR_MENU:
                             running = handleDoctorMenuCommand(command);
-                            System.out.println(currentState());
                             break;
 
                         case SEARCH_PATIENT:
@@ -1308,6 +1306,7 @@ public class ServerThread {
         // SEARCH_PATIENT: here the doctor searches and selects a patient
         // Next: VIEW_PATIENT or back to DOCTOR_MENU
         private boolean handleSearchPatientCommand(String command) throws IOException {
+            System.out.println(command+"!");
             switch (command) {
                 case "VIEW_PATIENT":
                     // here you normally would read which patient was selected
@@ -1595,6 +1594,7 @@ public class ServerThread {
                 String InsuranceNumbersMessage=  String.join(", ", InsuranceNumbers);
 
                 outputStream.writeUTF(InsuranceNumbersMessage);
+                outputStream.flush();
 
             } catch (SQLException e) {
                 throw new RuntimeException(e);
