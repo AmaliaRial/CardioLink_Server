@@ -48,7 +48,6 @@ public class JDBCDoctorManager implements DoctorManager {
             psDoc.executeUpdate();
         }
 
-        c.commit();
     }
 
     @Override

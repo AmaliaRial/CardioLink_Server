@@ -26,9 +26,6 @@ import java.util.stream.Collectors;
 import org.springframework.security.crypto.bcrypt.BCrypt;
 import pojos.enums.Sex;
 
-import javax.print.Doc;
-import javax.swing.*;
-
 public class ServerThread {
 
     private static final String DataBase_Address = "jdbc:sqlite:CardioLink.db";
@@ -183,15 +180,29 @@ public class ServerThread {
                 userMan = new JDBCUserManager(conMan);
                 String clientType = inputStream.readUTF();
                 if(clientType.equalsIgnoreCase("Patient")){
-                    System.out.println("Is a patient");
+
+                    String patientIP = socket.getInetAddress().getHostAddress();
+                    int patientPort = socket.getPort();
+
+                    System.out.println("PATIENT Connected from IP: " + patientIP + ", Port: " + patientPort);
+
                     new Thread(new ServerPatientThread(socket,inputStream, outputStream, doctorMan, patientMan, conMan, userMan)).start();
                 } else if(clientType.equalsIgnoreCase("Doctor")){
-                    System.out.println("Is a doctor");
+
+                    String doctorIP = socket.getInetAddress().getHostAddress();
+                    int doctorPort = socket.getPort();
+
+                    System.out.println("DOCTOR Connected from IP: " + doctorIP + ", Port: " + doctorPort);
+
 
                     new Thread(new ServerDoctorThread(socket, inputStream, outputStream, doctorMan, patientMan, conMan, userMan)).start();
 
                 } else if(clientType.equalsIgnoreCase("Admin")){
-                    System.out.println("Is an administrator");
+
+                    String adminIP = socket.getInetAddress().getHostAddress();
+                    int adminPort = socket.getPort();
+                    System.out.println("ADMINISTRATOR Connected from IP: " + adminIP + ", Port: " + adminPort);
+
                     new Thread(new ServerAdminThread(socket,inputStream,serverSocket)).start();
                 }
             }catch(IOException ex){
@@ -598,7 +609,7 @@ public class ServerThread {
                 this.loggedPatient=patient;
 
                 outputStream.writeUTF("ACK");
-                outputStream.writeUTF("Sign up successful. You can log in now.");
+                outputStream.writeUTF("Account created successfully.");
                 outputStream.flush();
             } catch (Exception ex) {
                 outputStream.writeUTF("ERROR");
@@ -1443,37 +1454,43 @@ public class ServerThread {
         /* ============================ BUSINESS LOGIC STUBS ============================ */
 
         private void handleSignupDoctor() throws IOException {
-            try {
-                String username = inputStream.readUTF();
-                String password = inputStream.readUTF();
-                String name = inputStream.readUTF();
-                String surname = inputStream.readUTF();
-                String birthday = inputStream.readUTF(); // "dd-MM-yyyy"
-                String sex = inputStream.readUTF();
-                String email = inputStream.readUTF();
-                String specialty = inputStream.readUTF();
-                String licenseNumber = inputStream.readUTF();
-                String dni = inputStream.readUTF();
 
-                // Sanitize y validar DNI
-                String dniClean = dni == null ? "" : dni.replaceAll("[^0-9A-Za-z]", "").toUpperCase();
-                if (!dniClean.matches("\\d{8}[A-Z]") && !dniClean.matches("[XYZ]\\d{7}[A-Z]")) {
-                    outputStream.writeUTF("ERROR");
-                    outputStream.writeUTF(
-                            "Invalid DNI/NIE format. Expected 8 dígitos + letra (12345678A) " +
-                                    "o NIE tipo X1234567L."
-                    );
-                    outputStream.flush();
-                    return;
-                }
+            String username = inputStream.readUTF();
+            String password = inputStream.readUTF();
+            String name = inputStream.readUTF();
+            String surname = inputStream.readUTF();
+            String birthday = inputStream.readUTF(); // "dd-MM-yyyy"
+            String sex = inputStream.readUTF();
+            String email = inputStream.readUTF();
+            String specialty = inputStream.readUTF();
+            String licenseNumber = inputStream.readUTF();
+            String dni = inputStream.readUTF();
+
+            // Sanitize y validar DNI
+            String dniClean = dni == null ? "" : dni.replaceAll("[^0-9A-Za-z]", "").toUpperCase();
+            if (!dniClean.matches("\\d{8}[A-Z]") && !dniClean.matches("[XYZ]\\d{7}[A-Z]")) {
+                outputStream.writeUTF("ERROR");
+                outputStream.writeUTF(
+                        "Invalid DNI/NIE format. Expected 8 dígitos + letra (12345678A) " +
+                                "o NIE tipo X1234567L."
+                );
+                outputStream.flush();
+                return;
+            }
 
 
-                if (!email.matches("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+$")) {
-                    outputStream.writeUTF("ERROR");
-                    outputStream.writeUTF("Invalid email format.");
-                    outputStream.flush();
-                    return;
-                }
+            if (!email.matches("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+$")) {
+                outputStream.writeUTF("ERROR");
+                outputStream.writeUTF("Invalid email format.");
+                outputStream.flush();
+                return;
+            }
+
+
+            String encryptedPass = hashPassword(password);
+            try{
+                userMan.registerDoctor(username, encryptedPass, "DOCTOR");
+                int userId = userMan.getUserId(username);
 
                 // Parse fecha en formato dd-MM-yyyy
                 Date parsedDob = null;
@@ -1486,90 +1503,18 @@ public class ServerThread {
                     outputStream.flush();
                     return;
                 }
-                String dob = String.valueOf(parsedDob.getTime());
 
-                String encryptedPass = hashPassword(password);
+                Sex sex1 = parseSex(sex);
 
-                try (var c = conMan.getConnection()) {
-                    c.setAutoCommit(false);
-                    try {
+                Doctor doctor =  new Doctor(userId, name, surname, dniClean, parsedDob, email, sex1, licenseNumber, specialty);
+                doctorMan.addDoctor(doctor);
+                this.loggedDoctor = doctor;
 
-                        int newUserId;
-                        try (var psUser = c.prepareStatement(
-                                "INSERT INTO users (username, password, role) VALUES (?,?,?)",
-                                Statement.RETURN_GENERATED_KEYS)) {
-                            psUser.setString(1, username);
-                            psUser.setString(2, encryptedPass);
-                            psUser.setString(3, "DOCTOR");
-                            psUser.executeUpdate();
-                            try (var keys = psUser.getGeneratedKeys()) {
-                                if (!keys.next()) {
-                                    throw new SQLException("No user id generated");
-                                }
-                                newUserId = keys.getInt(1);
-                            }
-                        }
+                outputStream.writeUTF("ACK");
+                outputStream.writeUTF("Account created successfully.");
+                outputStream.flush();
 
-                        //
-                        try (var check = c.prepareStatement("SELECT idDoctor FROM doctors WHERE userId = ?")) {
-                            check.setInt(1, newUserId);
-                            try (var rs = check.executeQuery()) {
-                                if (rs.next()) {
-                                    c.rollback();
-                                    outputStream.writeUTF("ERROR");
-                                    outputStream.writeUTF("Doctor already registered for this user.");
-                                    outputStream.flush();
-                                    return;
-                                }
-                            }
-                        }
 
-                        //
-                        try (PreparedStatement psDoc = c.prepareStatement(
-                                "INSERT INTO doctors (userId, nameDoctor, surnameDoctor, dniDoctor, dobDoctor, emailDoctor, sexDoctor, specialty, licenseNumber) VALUES (?,?,?,?,?,?,?,?,?)")) {
-                            psDoc.setInt(1, newUserId);          // userId obtenido al crear el user
-                            psDoc.setString(2, name);
-                            psDoc.setString(3, surname);
-                            psDoc.setString(4, dniClean);
-                            psDoc.setString(5, dob); // usamos yyyy-MM-dd en la BDD
-                            psDoc.setString(6, email);
-                            psDoc.setString(7, sex);
-                            psDoc.setString(8, specialty);
-                            psDoc.setString(9, licenseNumber);
-
-                            System.out.println("Insertando doctor: userId=" + newUserId + " dni=" + dniClean + " email=" + email);
-
-                            psDoc.executeUpdate();
-                        }
-                        c.commit();
-                        loggedDoctor= doctorMan.getDoctorbyUserId(newUserId);
-                        loggedDoctorId=loggedDoctor.getIdDoctor();
-                        outputStream.writeUTF("ACK");
-                        outputStream.writeUTF("Doctor sign up successful. You can log in now.");
-                        outputStream.flush();
-                        return;
-                    } catch (SQLException ex) {
-                        try {
-                            c.rollback();
-                        } catch (SQLException ignore) {
-                        }
-                        String msg = ex.getMessage() != null ? ex.getMessage() : ex.toString();
-                        if (msg.contains("UNIQUE") || msg.contains("constraint failed")) {
-                            outputStream.writeUTF("ERROR");
-                            outputStream.writeUTF("User or doctor already exists (unique constraint).");
-                        } else {
-                            outputStream.writeUTF("ERROR");
-                            outputStream.writeUTF("Sign up DB error: " + msg);
-                        }
-                        outputStream.flush();
-                        return;
-                    } finally {
-                        try {
-                            c.setAutoCommit(true);
-                        } catch (SQLException ignore) {
-                        }
-                    }
-                }
             } catch (Exception ex) {
                 outputStream.writeUTF("ERROR");
                 outputStream.writeUTF("Sign up failed: " + ex.getMessage());
@@ -1578,48 +1523,26 @@ public class ServerThread {
         }
 
         private void handleLoginDoctor() throws IOException {
+
             try {
                 String username = inputStream.readUTF();
                 String password = inputStream.readUTF();
+                //boolean logged = userMan.verifyPassword(username, password);
                 String storedpw = userMan.getPassword(username);
                 boolean logged = checkPassword(password, storedpw);
+                if (logged) {
+                    User u = userMan.getUserByUsername(username);
+                    int userId = u.getIdUser();
+                    loggedDoctor = doctorMan.getDoctorbyUserId(userId);
+                }
 
                 outputStream.writeUTF("LOGIN_RESULT");
-
-                if (!logged) {
+                if (logged) {
+                    outputStream.writeBoolean(true);
+                    outputStream.writeUTF("Login successful. Welcome " + loggedDoctor.getNameDoctor() + "!");
+                } else {
                     outputStream.writeBoolean(false);
                     outputStream.writeUTF("Invalid username or password.");
-                    outputStream.flush();
-                    return;
-                }
-
-                User u = userMan.getUserByUsername(username);
-                if (u == null || u.getRole() == null || !u.getRole().equalsIgnoreCase("DOCTOR")) {
-                    outputStream.writeBoolean(false);
-                    outputStream.writeUTF("User is not a doctor.");
-                    outputStream.flush();
-                    return;
-                }
-
-                try (var c = conMan.getConnection();
-                     var ps = c.prepareStatement("SELECT idDoctor FROM doctors WHERE userId = ?")) {
-                    ps.setInt(1, u.getIdUser());
-                    try (var rs = ps.executeQuery()) {
-                        if (rs.next()) {
-                            loggedDoctorUserId = u.getIdUser();
-                            loggedDoctorId = rs.getInt("idDoctor");
-                            loggedDoctor= doctorMan.getDoctorbyUserId(loggedDoctorUserId);
-                            outputStream.writeBoolean(true);
-                            outputStream.writeUTF("Login successful. Welcome doctor " + username);
-                        } else {
-                            outputStream.writeBoolean(false);
-                            outputStream.writeUTF("Doctor record not found in doctors table.");
-                        }
-                    }
-                } catch (SQLException ex) {
-                    Logger.getLogger(ServerThread.class.getName()).log(Level.SEVERE, "DB error during doctor login", ex);
-                    outputStream.writeBoolean(false);
-                    outputStream.writeUTF("Login error: " + ex.getMessage());
                 }
                 outputStream.flush();
             } catch (Exception e) {
@@ -1627,6 +1550,28 @@ public class ServerThread {
                 outputStream.writeBoolean(false);
                 outputStream.writeUTF("Login error: " + e.getMessage());
                 outputStream.flush();
+            }
+        }
+
+        private Sex parseSex(String sexStr) {
+            if (sexStr == null) {
+                throw new IllegalArgumentException("Sex value is null");
+            }
+            String s = sexStr.toUpperCase();
+
+            // Map common cases
+            if (s.equals("M") || s.equals("MALE") || s.equals("MAN") || s.equals("H") || s.equals("HOMBRE")) {
+                return Sex.MALE;
+            }
+            if (s.equals("F") || s.equals("FEMALE") || s.equals("W") || s.equals("WOMAN") || s.equals("MUJER")) {
+                return Sex.FEMALE;
+            }
+
+            // Try direct enum name (in case client already sends MALE/FEMALE or other valid names)
+            try {
+                return Sex.valueOf(s);
+            } catch (IllegalArgumentException ex) {
+                throw new IllegalArgumentException("Valor de sexo no reconocido: " + sexStr);
             }
         }
 
