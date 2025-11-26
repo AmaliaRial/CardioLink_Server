@@ -287,6 +287,8 @@ public class ServerThread {
         private final List<Integer> EDA = new ArrayList<>();
         private ArrayList<String> currentSymptoms = new ArrayList<>();
         private Patient loggedPatient = null;
+        private Integer loggedPatientId = null;
+        private Integer loggedPatientUserId = null;
 
         // STATE MACHINE
         private enum State {
@@ -632,6 +634,12 @@ public class ServerThread {
                 if (logged) {
                     User u = userMan.getUserByUsername(username);
                     int userId = u.getIdUser();
+                    if(u.getRole().equals("PATIENT")){
+                        this.loggedPatientUserId = userId;
+                        this.loggedPatientId = patientMan.getPatientByUserId(userId).getIdPatient();
+                    } else {
+                        logged = false; // not a doctor
+                    }
                     loggedPatient = patientMan.getPatientByUserId(userId);
                 }
 
@@ -1533,6 +1541,12 @@ public class ServerThread {
                 if (logged) {
                     User u = userMan.getUserByUsername(username);
                     int userId = u.getIdUser();
+                    if(u.getRole().equals("DOCTOR")){
+                        this.loggedDoctorUserId = userId;
+                        this.loggedDoctorId = doctorMan.getDoctorbyUserId(userId).getIdDoctor();
+                    } else {
+                        logged = false; // not a doctor
+                    }
                     loggedDoctor = doctorMan.getDoctorbyUserId(userId);
                 }
 
