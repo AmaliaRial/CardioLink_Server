@@ -660,40 +660,94 @@ public class ServerThread {
             }
         }
 
+
         private void handleStart() throws IOException {
-            // Here you can start ECG/EDA acquisition, etc.
-            // Use ECG and EDA lists if needed.
             DiagnosisFile df = new DiagnosisFile(loggedPatient.getIdPatient());
             try {
                 patientMan.AddNewDiagnosisFile(df);
                 df.setId(patientMan.returnIdOfLastDiagnosisFile());
+
+                // Indica al cliente que puede empezar a enviar fragmentos
                 outputStream.writeUTF("READY_TO_RECORD");
                 outputStream.flush();
-                String message= inputStream.readUTF();
 
-                if (!message.equals("STOP")) {
-                    patientMan.saveFragmentOfRecording(df.getId(), message);
-                } else if(message.equals("STOP")){
-                    handleEndOfRecording();
-                    outputStream.writeUTF("RECORDING_STOP");
-                    outputStream.flush();
-
-                    outputStream.writeUTF("SELECT_SYMPTOMS");
-                    outputStream.flush();
-                    String selectedSymptoms = inputStream.readUTF();
-                    if (selectedSymptoms != null && !selectedSymptoms.isEmpty()) {
-                        patientMan.updateSymptomsInDiagnosisFile(df.getId(), selectedSymptoms);
-                        outputStream.writeUTF("SYMPTOMS_RECEIVED");
-                        outputStream.flush();
+                // Bucle: recibir fragmentos cada ~10s hasta recibir "STOP"
+                while (true) {
+                    String message;
+                    try {
+                        message = inputStream.readUTF();
+                        System.out.println(message);
+                    } catch (EOFException eof) {
+                        System.out.println("Client closed socket during recording");
+                        break;
                     }
 
+                    if (message == null) {
+                        break;
+                    }
+
+                    message = message.trim();
+                    if ("STOP".equalsIgnoreCase(message)) {
+                        // Enviar confirmación de STOP inmediatamente para que el cliente la reciba
+                        try {
+                            outputStream.writeUTF("RECORDING_STOP");
+                            outputStream.flush();
+                        } catch (IOException e) {
+                            System.err.println("Failed to send RECORDING_STOP: " + e.getMessage());
+                            // seguimos intentando cerrar correctamente la grabación aunque el ACK no se haya enviado
+                        }
+
+                        // Finalizar recepción y guardar registro final; no dejar que excepciones impidan
+                        try {
+                            handleEndOfRecording();
+                        } catch (IOException e) {
+                            // Log y continuar: ya informamos al cliente con RECORDING_STOP
+                            Logger.getLogger(ServerThread.class.getName()).log(Level.SEVERE, "Error during end of recording", e);
+                        }
+
+                        // Pedir síntomas al paciente y procesarlos con su propio try/catch
+                        try {
+                            outputStream.writeUTF("SELECT_SYMPTOMS");
+                            outputStream.flush();
+
+                            String selectedSymptoms = null;
+                            try {
+                                selectedSymptoms = inputStream.readUTF();
+                            } catch (EOFException eof) {
+                                System.out.println("Client closed before sending symptoms");
+                            }
+
+                            if (selectedSymptoms != null && !selectedSymptoms.isEmpty()) {
+                                patientMan.updateSymptomsInDiagnosisFile(df.getId(), selectedSymptoms);
+                                outputStream.writeUTF("SYMPTOMS_RECEIVED");
+                                outputStream.flush();
+                            }
+                        } catch (IOException ioe) {
+                            System.out.println("I/O while requesting/reading symptoms: " + ioe.getMessage());
+                        }
+
+                        break; // salir del bucle de grabación
+                    } else {
+                        // Guardar fragmento en BD
+                        System.out.println("Received fragment for DF id " + df.getId() + ": " + message);
+                        try {
+                            patientMan.saveFragmentOfRecording(df.getId(), message);
+                            outputStream.writeUTF("FRAGMENT_SAVED");
+                        } catch (SQLException e) {
+                            Logger.getLogger(ServerThread.class.getName()).log(Level.SEVERE, "Error saving fragment", e);
+                            outputStream.writeUTF("ERROR_SAVING_FRAGMENT");
+                            outputStream.writeUTF(e.getMessage() == null ? "DB error" : e.getMessage());
+                        }
+                        outputStream.flush();
+                    }
                 }
+
             } catch (SQLException e) {
                 throw new RuntimeException(e);
             }
-
-
         }
+
+
 
         private void handleViewPatientOverview() throws IOException {
             // Send basic info about loggedPatient to client
