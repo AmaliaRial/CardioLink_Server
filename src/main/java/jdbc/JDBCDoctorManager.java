@@ -389,9 +389,9 @@ public class JDBCDoctorManager implements DoctorManager {
     public List<DiagnosisFile> listDiagnosisFilesTODO() {
         List<DiagnosisFile> diagnosisFiles = new ArrayList<>();
 
-        String sql = "SELECT df.id, df.symptoms, df.diagnosis, df.medication, df.date, df.patientId, df.status " +
+        String sql = "SELECT df.idDiagnosisFile, df.symptoms, df.diagnosis, df.medication, df.date, df.patientId, df.status " +
                 "FROM diagnosisFiles df " +
-                "JOIN patients p ON df.patientId = p.id " +
+                "JOIN patients p ON df.patientId = p.idPatient " +
                 "WHERE df.status = FALSE";
 
         try (PreparedStatement ps = c.prepareStatement(sql)) {
@@ -433,7 +433,7 @@ public class JDBCDoctorManager implements DoctorManager {
     public List<DiagnosisFile> getAllDiagnosisFilesFromPatient(int idPatient) {
         List<DiagnosisFile> diagnosisFiles = new ArrayList<>();
 
-        String sql = "SELECT df.id, df.symptoms, df.diagnosis, df.medication, df.date, df.patientId, df.status " +
+        String sql = "SELECT df.idDiagnosisFile, df.symptoms, df.diagnosis, df.medication, df.date, df.patientId, df.status " +
                 "FROM diagnosisFiles df " +
                 "WHERE df.patientId = ?";
 
