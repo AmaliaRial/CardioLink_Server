@@ -435,7 +435,7 @@ public class JDBCDoctorManager implements DoctorManager {
 
         String sql = "SELECT df.idDiagnosisFile, df.symptoms, df.diagnosis, df.medication, df.date, df.patientId, df.status " +
                 "FROM diagnosisFiles df " +
-                "WHERE df.patientId = ?" +
+                "WHERE df.patientId = ? " +
                 "AND df.status = TRUE";
 
         try (PreparedStatement ps = c.prepareStatement(sql)) {
@@ -455,7 +455,47 @@ public class JDBCDoctorManager implements DoctorManager {
                     }
                     String diagnosis = rs.getString("diagnosis");
                     String medication = rs.getString("medication");
-                    LocalDate date = rs.getDate("date").toLocalDate();
+
+                    LocalDate date = null;
+                    String dateStr = rs.getString("date");
+                    if (dateStr != null) {
+                        dateStr = dateStr.trim();
+                        // epoch millis (numeric)
+                        if (dateStr.matches("\\d+")) {
+                            try {
+                                long millis = Long.parseLong(dateStr);
+                                date = java.time.Instant.ofEpochMilli(millis)
+                                        .atZone(java.time.ZoneId.systemDefault())
+                                        .toLocalDate();
+                            } catch (NumberFormatException ignored) { }
+                        } else {try {
+                            date = java.time.LocalDate.parse(dateStr, java.time.format.DateTimeFormatter.ISO_LOCAL_DATE);
+                        } catch (java.time.format.DateTimeParseException e1) {
+                            // try common datetime patterns (fallback)
+                            try {
+                                java.time.LocalDateTime ldt = java.time.LocalDateTime.parse(dateStr,
+                                        java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS"));
+                                date = ldt.toLocalDate();
+                            } catch (java.time.format.DateTimeParseException e2) {
+                                try {
+                                    java.time.LocalDateTime ldt = java.time.LocalDateTime.parse(dateStr,
+                                            java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+                                    date = ldt.toLocalDate();
+                                } catch (java.time.format.DateTimeParseException ignored) {
+                                    // leave date null if unparseable
+                                }
+                            }
+                        }
+                        }
+                    } else {
+                        // last-resort: if column stored as numeric type, try getLong (keeps behavior robust)
+                        long millis = rs.getLong("date");
+                        if (!rs.wasNull()) {
+                            date = java.time.Instant.ofEpochMilli(millis)
+                                    .atZone(java.time.ZoneId.systemDefault())
+                                    .toLocalDate();
+                        }
+                    }
                     int patientId = rs.getInt("patientId");
                     boolean status = rs.getBoolean("status");
 
