@@ -1395,7 +1395,7 @@ public class ServerThread {
                     goTo(State.VIEW_DIAGNOSISFILE);   // ★1
                     return true;
 
-                case "BACK_TO_MENU":                  // really: back to SEARCH_PATIENT
+                case "BACK_TO_SEARCH_PATIENT":                  // really: back to SEARCH_PATIENT
                     goBack();                         // pops VIEW_PATIENT -> SEARCH_PATIENT on top
                     return true;
 
@@ -1669,6 +1669,7 @@ public class ServerThread {
                 selectedPatient.setDiagnosisList(diagnosisFiles);
                 outputStream.writeUTF("PATIENT_OVERVIEW_SENT");
                 outputStream.writeUTF(selectedPatient.toString());
+                outputStream.flush();
 
             } catch (SQLException e) {
                 throw new RuntimeException(e);

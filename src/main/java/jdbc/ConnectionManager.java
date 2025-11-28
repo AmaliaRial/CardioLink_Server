@@ -103,7 +103,7 @@ public class ConnectionManager {
                     ");");
 
             st.execute("CREATE TABLE IF NOT EXISTS recordings (" +
-                    "id_recording INTEGER PRIMARY KEY," +
+                    "id_recording INTEGER PRIMARY KEY AUTOINCREMENT," +
                     "diagnosisFileId INTEGER," +
                     "data TEXT," +
                     "sequence INTEGER," +

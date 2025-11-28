@@ -339,7 +339,7 @@ public class JDBCDoctorManager implements DoctorManager {
     public void modifyDiagnosisFile(DiagnosisFile diagnosisFile) {
         try {
             // SQL query to update the diagnosis file
-            String template = "UPDATE diagnosisFiles SET symptoms = ?, diagnosis = ?, medication = ?, date = ?, patientId = ?, status = ? WHERE id = ?;";
+            String template = "UPDATE diagnosisFiles SET symptoms = ?, diagnosis = ?, medication = ?, date = ?, patientId = ?, status = ? WHERE idDiagnosisFile = ?;";
 
             // Prepare the statement
             PreparedStatement ps = c.prepareStatement(template);
@@ -398,7 +398,7 @@ public class JDBCDoctorManager implements DoctorManager {
 
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
-                    int id = rs.getInt("id");
+                    int id = rs.getInt("idDiagnosisFile");
                     ArrayList<String> symptoms = new ArrayList<>();
                     String symptomsStr = rs.getString("symptoms");
                     if (symptomsStr != null && !symptomsStr.isEmpty()) {
@@ -435,7 +435,8 @@ public class JDBCDoctorManager implements DoctorManager {
 
         String sql = "SELECT df.idDiagnosisFile, df.symptoms, df.diagnosis, df.medication, df.date, df.patientId, df.status " +
                 "FROM diagnosisFiles df " +
-                "WHERE df.patientId = ?";
+                "WHERE df.patientId = ?" +
+                "AND df.status = TRUE";
 
         try (PreparedStatement ps = c.prepareStatement(sql)) {
             // Establecer el id del paciente en la consulta
@@ -444,7 +445,7 @@ public class JDBCDoctorManager implements DoctorManager {
             try (ResultSet rs = ps.executeQuery()) {
                 // Procesar los resultados
                 while (rs.next()) {
-                    int id = rs.getInt("id");
+                    int id = rs.getInt("idDiagnosisFile");
                     ArrayList<String> symptoms = new ArrayList<>();
                     String symptomsStr = rs.getString("symptoms");
                     if (symptomsStr != null && !symptomsStr.isEmpty()) {
