@@ -665,18 +665,21 @@ public class ServerThread {
             DiagnosisFile df = new DiagnosisFile(loggedPatient.getIdPatient());
             try {
                 patientMan.AddNewDiagnosisFile(df);
-                df.setId(patientMan.returnIdOfLastDiagnosisFile());
+                int idDiagnosisFile=patientMan.returnIdOfLastDiagnosisFile();
+                System.out.println(idDiagnosisFile);
+                df.setId(idDiagnosisFile);
 
                 // Indica al cliente que puede empezar a enviar fragmentos
                 outputStream.writeUTF("READY_TO_RECORD");
                 outputStream.flush();
+                int sequence=0;
 
                 // Bucle: recibir fragmentos cada ~10s hasta recibir "STOP"
                 while (true) {
+                    sequence++;
                     String message;
                     try {
                         message = inputStream.readUTF();
-                        System.out.println(message);
                     } catch (EOFException eof) {
                         System.out.println("Client closed socket during recording");
                         break;
@@ -729,9 +732,9 @@ public class ServerThread {
                         break; // salir del bucle de grabación
                     } else {
                         // Guardar fragmento en BD
-                        System.out.println("Received fragment for DF id " + df.getId() + ": " + message);
                         try {
-                            patientMan.saveFragmentOfRecording(df.getId(), message);
+                            System.out.println("metiendonos en saveFragmentOfRecording");
+                            patientMan.saveFragmentOfRecording(idDiagnosisFile, message, sequence);
                             outputStream.writeUTF("FRAGMENT_SAVED");
                         } catch (SQLException e) {
                             Logger.getLogger(ServerThread.class.getName()).log(Level.SEVERE, "Error saving fragment", e);
@@ -938,8 +941,6 @@ public class ServerThread {
                 diag.setDiagnosis("Pending"); // default, doctor modifies later
                 diag.setMedication("Pending");
 
-                saveDiagnosisFile(diag);
-
                 outputStream.writeUTF("ACK");
                 outputStream.writeUTF("Data saved successfully in diagnosisFile.");
                 outputStream.flush();
@@ -972,28 +973,6 @@ public class ServerThread {
          * outputStream.flush();
          * }
          */
-
-        private void saveDiagnosisFile(DiagnosisFile file) throws SQLException {
-            // Use JDBCDoctorManager to insert a new record
-            try (var c = conMan.getConnection();
-                 var ps = c.prepareStatement(
-                         "INSERT INTO diagnosisFile (symptoms, diagnosis, medication, date, patientId, sensorDataECG, sensorDataEDA) VALUES (?,?,?,?,?,?,?)")) {
-
-                String symptomsSerialized = file.getSymptoms() == null ? "" :
-                        file.getSymptoms().stream()
-                                //.map(Symptoms::getNameSymptom) NOT A CLASS GET NAME DIRECT FROM STRING
-                                .collect(Collectors.joining(", "));
-
-                ps.setString(1, symptomsSerialized);
-                ps.setString(2, file.getDiagnosis());
-                ps.setString(3, file.getMedication());
-                ps.setDate(4, java.sql.Date.valueOf(file.getDate()));
-                ps.setInt(5, file.getPatientId());
-                //ps.setString(6, file.getSensorDataECG());
-                //ps.setString(7, file.getSensorDataEDA());
-                ps.executeUpdate();
-            }
-        }
 
         public void sendAllDiagnosisFilesFromPatientToPatient(int idPatient) {
             DataOutputStream outputStream = null;

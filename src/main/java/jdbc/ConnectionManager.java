@@ -102,13 +102,15 @@ public class ConnectionManager {
                     "FOREIGN KEY(patientId) REFERENCES patients(idPatient) ON DELETE CASCADE" +
                     ");");
 
+            st.execute("DROP TABLE IF EXISTS recordings;");
+
             st.execute("CREATE TABLE IF NOT EXISTS recordings (" +
                     "id_recording INTEGER PRIMARY KEY AUTOINCREMENT," +
                     "diagnosisFileId INTEGER," +
                     "data TEXT," +
                     "sequence INTEGER," +
                     "anomaly BOOLEAN," +
-                    "FOREIGN KEY(diagnosisFileId) REFERENCES diagnosisFile(idDiagnosisFile) ON DELETE CASCADE" +
+                    "FOREIGN KEY(diagnosisFileId) REFERENCES diagnosisFiles(idDiagnosisFile) ON DELETE CASCADE" +
                     ");");
 
             st.execute("PRAGMA foreign_keys = ON");

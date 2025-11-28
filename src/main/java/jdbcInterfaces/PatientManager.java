@@ -15,7 +15,7 @@ public interface PatientManager {
     List<Boolean> getSateOfFragmentsOfRecordingByID(int idDiagnosisFile)throws SQLException;
     void AddNewDiagnosisFile(DiagnosisFile diagnosisFile)throws SQLException;
     int returnIdOfLastDiagnosisFile()throws SQLException;
-    void saveFragmentOfRecording(int idDiagnosisFile, String fragmentData)throws SQLException;
+    void saveFragmentOfRecording(int idDiagnosisFile, String fragmentData,int sequence)throws SQLException;
     int getNextSequenceNumber(Connection c, int idDiagnosisFile);
     void updateSymptomsInDiagnosisFile(int idDiagnosisFile, String selectedSymptoms);
     String getDoctornameByPatient(Patient loggedPatient);
