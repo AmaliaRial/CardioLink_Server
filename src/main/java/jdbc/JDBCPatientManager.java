@@ -18,6 +18,7 @@ import java.util.List;
 
  public class JDBCPatientManager implements PatientManager {
 
+     private Connection c;
      private final ConnectionManager conMan;
      private static final SimpleDateFormat SDF = new SimpleDateFormat("dd/MM/yyyy");
 
@@ -211,7 +212,7 @@ import java.util.List;
 
          String sql = "SELECT df.id, df.symptoms, df.diagnosis, df.medication, df.date, df.patientId, df.status " +
                  "FROM diagnosisFiles df " +
-                 "WHERE df.patientId = ? AND df.status = TRUE";
+                 "WHERE df.patientId = ? AND df.status = 1";
 
          try (Connection c = conMan.getConnection();
               PreparedStatement ps = c.prepareStatement(sql)) {
@@ -365,29 +366,26 @@ import java.util.List;
      }
 
      @Override
-     public void saveFragmentOfRecording(int idDiagnosisFile, String fragmentData) throws SQLException {
-         String sql = "INSERT INTO recordings (diagnosisFileId, data, anomaly, sequence) " +
+     public void saveFragmentOfRecording(int idDiagnosisFile, String fragmentData, int sequence) throws SQLException {
+         String sql = "INSERT INTO recordings (diagnosisFileId, data, sequence, anomaly) " +
                  "VALUES (?, ?, ?, ?)";
 
-         try (Connection c = conMan.getConnection();
-              PreparedStatement ps = c.prepareStatement(sql)) {
+         System.out.println("DEBUG SQL saveFragmentOfRecording: " + sql);
+         Connection c = conMan.getConnection();
+         System.out.println("coje la connexion");
+         PreparedStatement ps = c.prepareStatement(sql);
+         System.out.println("prepara el statement");
 
              // For simplicity, let's assume 'anomaly' is false and 'sequence' is auto-incremented
              ps.setInt(1, idDiagnosisFile);
              ps.setString(2, fragmentData);
-             ps.setBoolean(3, false);  // Defaulting anomaly to false
+             ps.setInt(3, sequence);
+             ps.setBoolean(4, false);// Defaulting anomaly to false
 
-             // Get the next sequence number for this diagnosisFileId
-             int nextSequence = getNextSequenceNumber(c, idDiagnosisFile);
-             ps.setInt(4, nextSequence);
 
              ps.executeUpdate();
              System.out.println("Fragment of recording saved successfully.");
 
-         } catch (SQLException e) {
-             System.out.println("Error saving fragment of recording to the database.");
-             e.printStackTrace();
-         }
      }
 
      @Override
@@ -411,7 +409,7 @@ import java.util.List;
 
      @Override
      public void updateSymptomsInDiagnosisFile(int idDiagnosisFile, String selectedSymptoms) {
-         String sql = "UPDATE diagnosisFiles SET symptoms = ? WHERE id = ?";
+         String sql = "UPDATE diagnosisFiles SET symptoms = ? WHERE idDiagnosisFile = ?";
 
          try (Connection c = conMan.getConnection();
               PreparedStatement ps = c.prepareStatement(sql)) {
