@@ -1375,7 +1375,8 @@ public class ServerThread {
                     return true;
 
                 case "BACK_TO_SEARCH_PATIENT":                  // really: back to SEARCH_PATIENT
-                    goBack();                         // pops VIEW_PATIENT -> SEARCH_PATIENT on top
+                    goBack();
+                    doOpenSearchPatient();// pops VIEW_PATIENT -> SEARCH_PATIENT on top
                     return true;
 
                 case "QUIT":
@@ -1646,8 +1647,9 @@ public class ServerThread {
                 Patient selectedPatient = doctorMan.getPatientByHIN(PatientHIN);
                 List<DiagnosisFile> diagnosisFiles = doctorMan.getAllDiagnosisFilesFromPatient(selectedPatient.getIdPatient());
                 selectedPatient.setDiagnosisList(diagnosisFiles);
-                outputStream.writeUTF("PATIENT_OVERVIEW_SENT");
+
                 outputStream.writeUTF(selectedPatient.toString());
+                outputStream.writeUTF("PATIENT_OVERVIEW_SENT");
                 outputStream.flush();
 
             } catch (SQLException e) {
