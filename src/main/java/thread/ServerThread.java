@@ -1405,6 +1405,7 @@ public class ServerThread {
                 case "BACK_TO_MENU":
                     // previous could be VIEW_PATIENT or COMPLETE_DIAGNOSISFILE
                     goBack();
+                    doListRecentlyFinished();
                     return true;
 
                 case "QUIT":
@@ -1448,6 +1449,10 @@ public class ServerThread {
         // Next: COMPLETE_DIAGNOSISFILE or back to DOCTOR_MENU
         private boolean handleRecentlyFinishCommand(String command) throws IOException {
             switch (command) {
+                case "RECENTLY_FINISHED":
+                    doListRecentlyFinished();
+                    return true;
+
                 case "COMPLETE_DIAGNOSISFILE":
                     doCompleteDiagnosisFileSelection();
                     goTo(State.COMPLETE_DIAGNOSISFILE);
@@ -1456,6 +1461,7 @@ public class ServerThread {
                 case "BACK_TO_MENU":
                     // back to DOCTOR_MENU
                     goBack();
+
                     return true;
 
                 case "QUIT":
@@ -1778,7 +1784,9 @@ public class ServerThread {
             List<DiagnosisFile> recentDF = null;
             recentDF = doctorMan.listDiagnosisFilesTODO();
 
-            outputStream.writeUTF(recentDF.toString());
+            for (DiagnosisFile df : recentDF) {
+                outputStream.writeUTF(df.toString());
+            }
 
             outputStream.writeUTF("RECENTLY_FINISHED");
         }

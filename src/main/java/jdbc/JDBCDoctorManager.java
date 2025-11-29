@@ -108,7 +108,7 @@ public class JDBCDoctorManager implements DoctorManager {
 
     @Override
     public DiagnosisFile getDiagnosisFileByID(int idDiagnosisFile) throws SQLException {
-        String sql = "SELECT * FROM diagnosisFiles WHERE id = ?";
+        String sql = "SELECT * FROM diagnosisFiles WHERE idDiagnosisFile = ?";
         try (Connection c = conMan.getConnection();
              PreparedStatement ps = c.prepareStatement(sql)) {
             ps.setInt(1, idDiagnosisFile);
@@ -123,7 +123,7 @@ public class JDBCDoctorManager implements DoctorManager {
                     }
                 }
                 DiagnosisFile df = new DiagnosisFile(
-                        rs.getInt("id"),
+                        rs.getInt("idDiagnosisFile"),
                         symptoms,
                         rs.getString("diagnosis"),
                         rs.getString("medication"),
@@ -517,7 +517,7 @@ public class JDBCDoctorManager implements DoctorManager {
 
     @Override
     public void UpDateDiagnosisFile(DiagnosisFile diagnosisFile) throws SQLException {
-        String sql = "UPDATE diagnosisFiles SET symptoms = ?, diagnosis = ?, medication = ?, date = ?, patientId = ?, status = ? WHERE id = ?";
+        String sql = "UPDATE diagnosisFiles SET symptoms = ?, diagnosis = ?, medication = ?, date = ?, patientId = ?, status = ? WHERE idDiagnosisFile = ?";
 
         try (Connection c = conMan.getConnection();
              PreparedStatement ps = c.prepareStatement(sql)) {
