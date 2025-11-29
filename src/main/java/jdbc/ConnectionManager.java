@@ -102,7 +102,6 @@ public class ConnectionManager {
                     "FOREIGN KEY(patientId) REFERENCES patients(idPatient) ON DELETE CASCADE" +
                     ");");
 
-            st.execute("DROP TABLE IF EXISTS recordings;");
 
             st.execute("CREATE TABLE IF NOT EXISTS recordings (" +
                     "id_recording INTEGER PRIMARY KEY AUTOINCREMENT," +
