@@ -14,6 +14,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -24,6 +25,8 @@ public class JDBCDoctorManager implements DoctorManager {
     private ConnectionManager conMan;
 
     private static final DateTimeFormatter DOB_FORMATTER =
+            DateTimeFormatter.ofPattern("dd-MM-yyyy");
+    private static final DateTimeFormatter DF_DATE_FORMATTER =
             DateTimeFormatter.ofPattern("dd-MM-yyyy");
 
     public JDBCDoctorManager(ConnectionManager conMan) {
@@ -132,12 +135,63 @@ public class JDBCDoctorManager implements DoctorManager {
                         symptoms.add(symptom.trim());
                     }
                 }
+
+                LocalDate date = null;
+                String dateStr = rs.getString("date");
+                if (dateStr != null) {
+                    dateStr = dateStr.trim();
+                    if (dateStr.matches("\\d+")) {
+                        try {
+                            long millis = Long.parseLong(dateStr);
+                            date = java.time.Instant.ofEpochMilli(millis)
+                                    .atZone(java.time.ZoneId.systemDefault())
+                                    .toLocalDate();
+                        } catch (NumberFormatException ignored) {
+                        }
+                    } else {
+                        boolean parsed = false;
+                        try {
+                            date = LocalDate.parse(dateStr, DF_DATE_FORMATTER);
+                            parsed = true;
+                        } catch (DateTimeParseException ignored) {
+                        }
+                        if (!parsed) {
+                            try {
+                                date = LocalDate.parse(dateStr, DateTimeFormatter.ISO_LOCAL_DATE);
+                                parsed = true;
+                            } catch (DateTimeParseException ignored) {
+                            }
+                        }
+                        if (!parsed) {
+                            try {
+                                java.time.LocalDateTime ldt = java.time.LocalDateTime.parse(dateStr,
+                                        java.time.format.DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm:ss.SSS"));
+                                date = ldt.toLocalDate();
+                            } catch (DateTimeParseException e2) {
+                                try {
+                                    java.time.LocalDateTime ldt = java.time.LocalDateTime.parse(dateStr,
+                                            java.time.format.DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm:ss"));
+                                    date = ldt.toLocalDate();
+                                } catch (DateTimeParseException ignored2) {
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    long millis = rs.getLong("date");
+                    if (!rs.wasNull()) {
+                        date = java.time.Instant.ofEpochMilli(millis)
+                                .atZone(java.time.ZoneId.systemDefault())
+                                .toLocalDate();
+                    }
+                }
+
                 DiagnosisFile df = new DiagnosisFile(
                         rs.getInt("idDiagnosisFile"),
                         symptoms,
                         rs.getString("diagnosis"),
                         rs.getString("medication"),
-                        rs.getDate("date").toLocalDate(),
+                        date,
                         rs.getInt("patientId"),
                         rs.getBoolean("status")
                 );
@@ -277,7 +331,18 @@ public class JDBCDoctorManager implements DoctorManager {
             ps.setString(1, symptomsSerialized);
             ps.setString(2, diagnosisFile.getDiagnosis());
             ps.setString(3, diagnosisFile.getMedication());
-            ps.setDate(4, java.sql.Date.valueOf(diagnosisFile.getDate()));
+
+            LocalDate dfDate = diagnosisFile.getDate();
+            String dfDateStr = null;
+            if (dfDate != null) {
+                dfDateStr = dfDate.format(DF_DATE_FORMATTER);
+            }
+            if (dfDateStr != null) {
+                ps.setString(4, dfDateStr);
+            } else {
+                ps.setNull(4, java.sql.Types.VARCHAR);
+            }
+
             ps.setInt(5, diagnosisFile.getPatientId());
             ps.setBoolean(6, diagnosisFile.getStatus());
             ps.setInt(7, diagnosisFile.getId());
@@ -314,7 +379,57 @@ public class JDBCDoctorManager implements DoctorManager {
                     }
                     String diagnosis = rs.getString("diagnosis");
                     String medication = rs.getString("medication");
-                    LocalDate date = rs.getDate("date").toLocalDate();
+
+                    LocalDate date = null;
+                    String dateStr = rs.getString("date");
+                    if (dateStr != null) {
+                        dateStr = dateStr.trim();
+                        if (dateStr.matches("\\d+")) {
+                            try {
+                                long millis = Long.parseLong(dateStr);
+                                date = java.time.Instant.ofEpochMilli(millis)
+                                        .atZone(java.time.ZoneId.systemDefault())
+                                        .toLocalDate();
+                            } catch (NumberFormatException ignored) {
+                            }
+                        } else {
+                            boolean parsed = false;
+                            try {
+                                date = LocalDate.parse(dateStr, DF_DATE_FORMATTER);
+                                parsed = true;
+                            } catch (DateTimeParseException ignored) {
+                            }
+                            if (!parsed) {
+                                try {
+                                    date = LocalDate.parse(dateStr, DateTimeFormatter.ISO_LOCAL_DATE);
+                                    parsed = true;
+                                } catch (DateTimeParseException ignored) {
+                                }
+                            }
+                            if (!parsed) {
+                                try {
+                                    java.time.LocalDateTime ldt = java.time.LocalDateTime.parse(dateStr,
+                                            java.time.format.DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm:ss.SSS"));
+                                    date = ldt.toLocalDate();
+                                } catch (DateTimeParseException e2) {
+                                    try {
+                                        java.time.LocalDateTime ldt = java.time.LocalDateTime.parse(dateStr,
+                                                java.time.format.DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm:ss"));
+                                        date = ldt.toLocalDate();
+                                    } catch (DateTimeParseException ignored2) {
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        long millis = rs.getLong("date");
+                        if (!rs.wasNull()) {
+                            date = java.time.Instant.ofEpochMilli(millis)
+                                    .atZone(java.time.ZoneId.systemDefault())
+                                    .toLocalDate();
+                        }
+                    }
+
                     int patientId = rs.getInt("patientId");
                     boolean status = rs.getBoolean("status");
 
@@ -369,9 +484,20 @@ public class JDBCDoctorManager implements DoctorManager {
                             } catch (NumberFormatException ignored) {
                             }
                         } else {
+                            boolean parsed = false;
                             try {
-                                date = java.time.LocalDate.parse(dateStr, java.time.format.DateTimeFormatter.ISO_LOCAL_DATE);
-                            } catch (java.time.format.DateTimeParseException e1) {
+                                date = LocalDate.parse(dateStr, DF_DATE_FORMATTER);
+                                parsed = true;
+                            } catch (DateTimeParseException ignored) {
+                            }
+                            if (!parsed) {
+                                try {
+                                    date = java.time.LocalDate.parse(dateStr, java.time.format.DateTimeFormatter.ISO_LOCAL_DATE);
+                                    parsed = true;
+                                } catch (java.time.format.DateTimeParseException e1) {
+                                }
+                            }
+                            if (!parsed) {
                                 try {
                                     java.time.LocalDateTime ldt = java.time.LocalDateTime.parse(dateStr,
                                             java.time.format.DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm:ss.SSS"));
@@ -381,7 +507,7 @@ public class JDBCDoctorManager implements DoctorManager {
                                         java.time.LocalDateTime ldt = java.time.LocalDateTime.parse(dateStr,
                                                 java.time.format.DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm:ss"));
                                         date = ldt.toLocalDate();
-                                    } catch (java.time.format.DateTimeParseException ignored) {
+                                    } catch (java.time.format.DateTimeParseException ignored2) {
                                     }
                                 }
                             }
@@ -424,7 +550,18 @@ public class JDBCDoctorManager implements DoctorManager {
             ps.setString(1, symptomsSerialized);
             ps.setString(2, diagnosisFile.getDiagnosis());
             ps.setString(3, diagnosisFile.getMedication());
-            ps.setDate(4, java.sql.Date.valueOf(diagnosisFile.getDate()));
+
+            LocalDate dfDate = diagnosisFile.getDate();
+            String dfDateStr = null;
+            if (dfDate != null) {
+                dfDateStr = dfDate.format(DF_DATE_FORMATTER);
+            }
+            if (dfDateStr != null) {
+                ps.setString(4, dfDateStr);
+            } else {
+                ps.setNull(4, java.sql.Types.VARCHAR);
+            }
+
             ps.setInt(5, diagnosisFile.getPatientId());
             ps.setBoolean(6, diagnosisFile.getStatus());
             ps.setInt(7, diagnosisFile.getId());
