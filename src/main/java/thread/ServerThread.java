@@ -1489,7 +1489,7 @@ public class ServerThread {
                 case "CANCEL":
                 case "BACK_TO_MENU":
                     // back to RECENTLY_FINISH
-                    goBack();
+                    goTo(State.DOCTOR_MENU);
                     return true;
 
                 case "QUIT":
