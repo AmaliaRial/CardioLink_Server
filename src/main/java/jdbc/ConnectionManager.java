@@ -28,6 +28,8 @@ public class ConnectionManager {
         Connection conn = DriverManager.getConnection(URL);
         try (Statement st = conn.createStatement()) {
             st.execute("PRAGMA foreign_keys=ON");
+            // IMPORTANT: wait up to 5 seconds if the DB is busy, instead of failing with SQLITE_BUSY
+            st.execute("PRAGMA busy_timeout = 5000");
         }
         return conn;
     }
@@ -38,6 +40,7 @@ public class ConnectionManager {
             c = DriverManager.getConnection(URL);
             try (Statement st = c.createStatement()) {
                 st.execute("PRAGMA foreign_keys=ON");
+                st.execute("PRAGMA busy_timeout = 5000");
             }
         } catch (ClassNotFoundException cnfE) {
             System.out.println("Databases libraries not loaded");

@@ -533,18 +533,11 @@ public class JDBCDoctorManager implements DoctorManager {
             ps.setString(3, diagnosisFile.getMedication());
             ps.setDate(4, java.sql.Date.valueOf(diagnosisFile.getDate()));  // Convert LocalDate to SQL Date
             ps.setInt(5, diagnosisFile.getPatientId());
-            ps.setBoolean(6, diagnosisFile.getStatus());  // Assuming 'status' is a boolean
+            ps.setBoolean(6, true);  // Assuming 'status' is a boolean
             ps.setInt(7, diagnosisFile.getId());  // Set the ID to identify the record to update
 
             // Execute the update
-            int rowsUpdated = ps.executeUpdate();
-
-            // Check if any rows were updated
-            if (rowsUpdated > 0) {
-                System.out.println("DiagnosisFile updated successfully with ID: " + diagnosisFile.getId());
-            } else {
-                System.out.println("No DiagnosisFile found with ID: " + diagnosisFile.getId());
-            }
+            ps.executeUpdate();
 
         } catch (SQLException e) {
             System.out.println("Error updating DiagnosisFile in the database.");

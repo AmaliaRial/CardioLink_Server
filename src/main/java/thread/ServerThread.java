@@ -1449,9 +1449,9 @@ public class ServerThread {
         // Next: COMPLETE_DIAGNOSISFILE or back to DOCTOR_MENU
         private boolean handleRecentlyFinishCommand(String command) throws IOException {
             switch (command) {
-                case "RECENTLY_FINISHED":
+                /*case "RECENTLY_FINISHED":
                     doListRecentlyFinished();
-                    return true;
+                    return true;*/
 
                 case "COMPLETE_DIAGNOSISFILE":
                     doCompleteDiagnosisFileSelection();
@@ -1461,7 +1461,6 @@ public class ServerThread {
                 case "BACK_TO_MENU":
                     // back to DOCTOR_MENU
                     goBack();
-
                     return true;
 
                 case "QUIT":
@@ -1780,7 +1779,7 @@ public class ServerThread {
         }
 
         private void doListRecentlyFinished() throws IOException {
-            outputStream.writeUTF("RECENTLY_FINISH_LIST");
+
             List<DiagnosisFile> recentDF = null;
             recentDF = doctorMan.listDiagnosisFilesTODO();
 
@@ -1792,14 +1791,17 @@ public class ServerThread {
         }
 
         private void doCompleteDiagnosisFileSelection() throws IOException {
-            outputStream.writeUTF("COMPLETE_DIAGNOSISFILE_READY");
+            //outputStream.writeUTF("COMPLETE_DIAGNOSISFILE_READY");
             String idDF = inputStream.readUTF();
             int idDiagnosisFile = Integer.parseInt(idDF);
             String diagnosisString = inputStream.readUTF();
+            String medicationString = inputStream.readUTF();
             try {
                 DiagnosisFile diagnosisFile = doctorMan.getDiagnosisFileByID(idDiagnosisFile);
                 diagnosisFile.setDiagnosis(diagnosisString);
+                diagnosisFile.setMedication(medicationString);
                 doctorMan.UpDateDiagnosisFile(diagnosisFile);
+
                 outputStream.writeUTF("COMPLETE_DIAGNOSISFILE_SAVED");
             } catch (SQLException e) {
                 throw new RuntimeException(e);
@@ -1813,158 +1815,6 @@ public class ServerThread {
             try { if (in != null) in.close(); } catch (IOException ignored) {}
             try { if (out != null) out.close(); } catch (IOException ignored) {}
             try { if (s != null && !s.isClosed()) s.close(); } catch (IOException ignored) {}
-        }
-
-        private void handleListPatients() throws IOException {
-            if (loggedDoctorUserId == null) {
-                outputStream.writeUTF("ERROR");
-                outputStream.writeUTF("Not authenticated as doctor.");
-                outputStream.flush();
-                return;
-            }
-
-            try (var c = conMan.getConnection();
-                 var ps = c.prepareStatement("SELECT idPatient, namePatient, surnamePatient, dniPatient FROM patients");
-                 var rs = ps.executeQuery()) {
-
-                ArrayList<Integer> ids = new ArrayList<>();
-                ArrayList<String> names = new ArrayList<>();
-                ArrayList<String> surnames = new ArrayList<>();
-                ArrayList<String> dnis = new ArrayList<>();
-                while (rs.next()) {
-                    ids.add(rs.getInt("idPatient"));
-                    names.add(rs.getString("namePatient"));
-                    surnames.add(rs.getString("surnamePatient"));
-                    dnis.add(rs.getString("dniPatient"));
-                }
-                outputStream.writeUTF("PATIENT_LIST");
-                outputStream.writeInt(ids.size());
-                for (int i = 0; i < ids.size(); i++) {
-                    outputStream.writeInt(ids.get(i));
-                    outputStream.writeUTF(names.get(i) == null ? "" : names.get(i));
-                    outputStream.writeUTF(surnames.get(i) == null ? "" : surnames.get(i));
-                    outputStream.writeUTF(dnis.get(i) == null ? "" : dnis.get(i));
-                }
-                outputStream.flush();
-            } catch (SQLException ex) {
-                Logger.getLogger(ServerThread.class.getName()).log(Level.SEVERE, "Error listing patients", ex);
-                outputStream.writeUTF("ERROR");
-                outputStream.writeUTF("Failed to list patients: " + ex.getMessage());
-                outputStream.flush();
-            }
-        }
-
-        private void handleGetDiagnosis() throws IOException {
-            if (loggedDoctorUserId == null) {
-                outputStream.writeUTF("ERROR");
-                outputStream.writeUTF("Not authenticated as doctor.");
-                outputStream.flush();
-                return;
-            }
-
-            int patientId = inputStream.readInt();
-            try (var c = conMan.getConnection();
-                 var ps = c.prepareStatement(
-                         "SELECT id, date, diagnosis, medication, sensorDataECG, sensorDataEDA, symptoms FROM diagnosisFile WHERE patientId = ?")) {
-                ps.setInt(1, patientId);
-                try (var rs = ps.executeQuery()) {
-                    ArrayList<Integer> ids = new ArrayList<>();
-                    ArrayList<String> dates = new ArrayList<>();
-                    ArrayList<String> diagnoses = new ArrayList<>();
-                    ArrayList<String> medications = new ArrayList<>();
-                    ArrayList<String> ecgs = new ArrayList<>();
-                    ArrayList<String> edas = new ArrayList<>();
-                    ArrayList<String> symptoms = new ArrayList<>();
-                    while (rs.next()) {
-                        ids.add(rs.getInt("id"));
-                        dates.add(rs.getDate("date") != null ? rs.getDate("date").toString() : "");
-                        diagnoses.add(rs.getString("diagnosis"));
-                        medications.add(rs.getString("medication"));
-                        ecgs.add(rs.getString("sensorDataECG"));
-                        edas.add(rs.getString("sensorDataEDA"));
-                        symptoms.add(rs.getString("symptoms"));
-                    }
-                    outputStream.writeUTF("DIAGNOSIS_LIST");
-                    outputStream.writeInt(ids.size());
-                    for (int i = 0; i < ids.size(); i++) {
-                        outputStream.writeInt(ids.get(i));
-                        outputStream.writeUTF(dates.get(i) == null ? "" : dates.get(i));
-                        outputStream.writeUTF(diagnoses.get(i) == null ? "" : diagnoses.get(i));
-                        outputStream.writeUTF(medications.get(i) == null ? "" : medications.get(i));
-                        outputStream.writeUTF(ecgs.get(i) == null ? "" : ecgs.get(i));
-                        outputStream.writeUTF(edas.get(i) == null ? "" : edas.get(i));
-                        outputStream.writeUTF(symptoms.get(i) == null ? "" : symptoms.get(i));
-                    }
-                    outputStream.flush();
-                }
-            } catch (SQLException ex) {
-                Logger.getLogger(ServerThread.class.getName()).log(Level.SEVERE, "Error retrieving diagnosis", ex);
-                outputStream.writeUTF("ERROR");
-                outputStream.writeUTF("Failed to get diagnosis: " + ex.getMessage());
-                outputStream.flush();
-            }
-        }
-
-        private void handleUpdateDiagnosis() throws IOException {
-            if (loggedDoctorUserId == null) {
-                outputStream.writeUTF("ERROR");
-                outputStream.writeUTF("Not authenticated as doctor.");
-                outputStream.flush();
-                return;
-            }
-
-            int diagnosisId = inputStream.readInt();
-            String newDiagnosis = inputStream.readUTF();
-            try (var c = conMan.getConnection();
-                 var ps = c.prepareStatement("UPDATE diagnosisFile SET diagnosis = ? WHERE id = ?")) {
-                ps.setString(1, newDiagnosis);
-                ps.setInt(2, diagnosisId);
-                int updated = ps.executeUpdate();
-                if (updated > 0) {
-                    outputStream.writeUTF("ACK");
-                    outputStream.writeUTF("Diagnosis updated");
-                } else {
-                    outputStream.writeUTF("ERROR");
-                    outputStream.writeUTF("Diagnosis not found");
-                }
-                outputStream.flush();
-            } catch (SQLException ex) {
-                Logger.getLogger(ServerThread.class.getName()).log(Level.SEVERE, "Error updating diagnosis", ex);
-                outputStream.writeUTF("ERROR");
-                outputStream.writeUTF("Failed to update diagnosis: " + ex.getMessage());
-                outputStream.flush();
-            }
-        }
-
-        private void handleUpdateMedication() throws IOException {
-            if (loggedDoctorUserId == null) {
-                outputStream.writeUTF("ERROR");
-                outputStream.writeUTF("Not authenticated as doctor.");
-                outputStream.flush();
-                return;
-            }
-
-            int diagnosisId = inputStream.readInt();
-            String newMedication = inputStream.readUTF();
-            try (var c = conMan.getConnection();
-                 var ps = c.prepareStatement("UPDATE diagnosisFile SET medication = ? WHERE id = ?")) {
-                ps.setString(1, newMedication);
-                ps.setInt(2, diagnosisId);
-                int updated = ps.executeUpdate();
-                if (updated > 0) {
-                    outputStream.writeUTF("ACK");
-                    outputStream.writeUTF("Medication updated");
-                } else {
-                    outputStream.writeUTF("ERROR");
-                    outputStream.writeUTF("Diagnosis not found");
-                }
-                outputStream.flush();
-            } catch (SQLException ex) {
-                Logger.getLogger(ServerThread.class.getName()).log(Level.SEVERE, "Error updating medication", ex);
-                outputStream.writeUTF("ERROR");
-                outputStream.writeUTF("Failed to update medication: " + ex.getMessage());
-                outputStream.flush();
-            }
         }
 
         public void SendDiagnosisFilesTODO(int idDoctor) {
@@ -2048,6 +1898,7 @@ public class ServerThread {
             }
         }
 
+        /*
         public DiagnosisFile ReceiveUpdatedDiagnosisFile() {
             DiagnosisFile updatedDiagnosisFile = null;
 
@@ -2060,7 +1911,7 @@ public class ServerThread {
                 updatedDiagnosisFile = convertStringToDiagnosisFile(diagnosisString);
 
                 // Actualizar el diagnóstico en el DoctorManager
-                doctorMan.UpDateDiagnosisFile(updatedDiagnosisFile);
+                doctorMan.UpDateDiagnosisFile(updatedDiagnosisFile, );
 
                 // Confirmación de que el diagnóstico fue actualizado correctamente
                 DataOutputStream outputStream = new DataOutputStream(socket.getOutputStream());
@@ -2074,7 +1925,7 @@ public class ServerThread {
             }
 
             return updatedDiagnosisFile;
-        }
+        }*/
 
         private DiagnosisFile convertStringToDiagnosisFile(String diagnosisString) {
             // Eliminar la parte inicial y final del String (MedicalRecord{...})
