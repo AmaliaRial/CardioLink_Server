@@ -8,10 +8,7 @@ import pojos.Patient;
 
 import java.io.FileWriter;
 import java.io.IOException;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
+import java.sql.*;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
@@ -245,6 +242,90 @@ public class JDBCDoctorManager implements DoctorManager {
                 return d;
             }
             return null;
+        }
+    }
+
+    @Override
+    public Patient getPatientByDiganosisFileID(int idDiagnosisFile) throws SQLException {
+        String query = "SELECT p.* FROM patients p " +
+                "INNER JOIN diagnosisFiles df ON p.idPatient = df.patientId " +
+                "WHERE df.idDiagnosisFile = ?";
+
+        try (Connection c = conMan.getConnection();
+             PreparedStatement stmt = c.prepareStatement(query)) {
+
+            stmt.setInt(1, idDiagnosisFile);
+
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    Patient patient = new Patient();
+                    patient.setIdPatient(rs.getInt("idPatient"));
+                    patient.setUserId(rs.getInt("userId"));
+                    patient.setNamePatient(rs.getString("namePatient"));
+                    patient.setSurnamePatient(rs.getString("surnamePatient"));
+                    patient.setDniPatient(rs.getString("dniPatient"));
+
+                    LocalDate date = null;
+                    String dateStr = rs.getString("dobPatient");
+                    if (dateStr != null) {
+                        dateStr = dateStr.trim();
+                        if (dateStr.matches("\\d+")) {
+                            try {
+                                long millis = Long.parseLong(dateStr);
+                                date = java.time.Instant.ofEpochMilli(millis)
+                                        .atZone(java.time.ZoneId.systemDefault())
+                                        .toLocalDate();
+                            } catch (NumberFormatException ignored) {
+                            }
+                        } else {
+                            boolean parsed = false;
+                            try {
+                                date = LocalDate.parse(dateStr, DF_DATE_FORMATTER);
+                                parsed = true;
+                            } catch (DateTimeParseException ignored) {
+                            }
+                            if (!parsed) {
+                                try {
+                                    date = LocalDate.parse(dateStr, DateTimeFormatter.ISO_LOCAL_DATE);
+                                    parsed = true;
+                                } catch (DateTimeParseException ignored) {
+                                }
+                            }
+                            if (!parsed) {
+                                try {
+                                    java.time.LocalDateTime ldt = java.time.LocalDateTime.parse(dateStr,
+                                            java.time.format.DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm:ss.SSS"));
+                                    date = ldt.toLocalDate();
+                                } catch (DateTimeParseException e2) {
+                                    try {
+                                        java.time.LocalDateTime ldt = java.time.LocalDateTime.parse(dateStr,
+                                                java.time.format.DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm:ss"));
+                                        date = ldt.toLocalDate();
+                                    } catch (DateTimeParseException ignored2) {
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        long millis = rs.getLong("date");
+                        if (!rs.wasNull()) {
+                            date = java.time.Instant.ofEpochMilli(millis)
+                                    .atZone(java.time.ZoneId.systemDefault())
+                                    .toLocalDate();
+                        }
+                    }
+
+                    patient.setDobPatient(Date.valueOf(date));
+                    patient.setEmailPatient(rs.getString("emailPatient"));
+                    patient.setSexPatient(Sex.valueOf(rs.getString("sexPatient")));
+                    patient.setPhoneNumberPatient(rs.getInt("phoneNumberPatient"));
+                    patient.setHealthInsuranceNumberPatient(rs.getInt("healthInsuranceNumberPatient"));
+                    patient.setEmergencyContactPatient(rs.getInt("emergencyContactPatient"));
+                    return patient;
+                } else {
+                    throw new SQLException("No diagnosis file found with ID: " + idDiagnosisFile);
+                }
+            }
         }
     }
 

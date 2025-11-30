@@ -1,6 +1,7 @@
 package thread;
 
 import jdbc.*;
+import jdbcInterfaces.DoctorManager;
 import pojos.DiagnosisFile;
 import pojos.Doctor;
 import pojos.Patient;
@@ -1817,13 +1818,24 @@ public class ServerThread {
         }
 
         private void doCompleteDiagnosisFileSelection() throws IOException {
+
             //outputStream.writeUTF("COMPLETE_DIAGNOSISFILE_READY");
-            String idDF = inputStream.readUTF();
-            int idDiagnosisFile = Integer.parseInt(idDF);
-            String diagnosisString = inputStream.readUTF();
-            String medicationString = inputStream.readUTF();
+            int idDF = inputStream.readInt();
+            System.out.println(idDF);
             try {
-                DiagnosisFile diagnosisFile = doctorMan.getDiagnosisFileByID(idDiagnosisFile);
+                Patient patientDF= doctorMan.getPatientByDiganosisFileID(idDF);
+                System.out.println(patientDF.toString());
+
+                outputStream.writeUTF(patientDF.getNamePatient()+","
+                                        +patientDF.getSurnamePatient()+","
+                                        +patientDF.getDobPatient()+","
+                                        +patientDF.getHealthInsuranceNumberPatient()+","
+                                        +patientDF.getSexPatient());
+
+                String diagnosisString = inputStream.readUTF();
+                String medicationString = inputStream.readUTF();
+
+                DiagnosisFile diagnosisFile = doctorMan.getDiagnosisFileByID(idDF);
                 diagnosisFile.setDiagnosis(diagnosisString);
                 diagnosisFile.setMedication(medicationString);
                 doctorMan.UpDateDiagnosisFile(diagnosisFile);

@@ -2,6 +2,7 @@ package jdbcInterfaces;
 
 import pojos.DiagnosisFile;
 import pojos.Doctor;
+import pojos.Patient;
 
 import java.sql.SQLException;
 
@@ -13,7 +14,7 @@ public interface DoctorManager {
     void modifyDiagnosisFile(DiagnosisFile diagnosisFile) throws SQLException;
 
     Doctor getDoctorbyUserId(int userId) throws SQLException;
-
+    Patient getPatientByDiganosisFileID(int idDiagnosisFile)throws SQLException;
     void downloadFileInComputer(DiagnosisFile diagnosisFile) throws IOException;
     List<DiagnosisFile> listDiagnosisFilesTODO();
     List<DiagnosisFile>  getAllDiagnosisFilesFromPatient(int idPatient);
