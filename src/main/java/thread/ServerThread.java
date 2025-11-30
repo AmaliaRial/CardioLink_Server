@@ -587,6 +587,12 @@ public class ServerThread {
 
             String encryptedPass = hashPassword(password);
             try {
+                if (userMan.userExists(username)) {
+                    outputStream.writeUTF("ERROR");
+                    outputStream.writeUTF("This person has already been registered.");
+                    outputStream.flush();
+                    return;
+                }
                 userMan.register(username, encryptedPass, "PATIENT");
                 int userId = userMan.getUserId(username);
 
@@ -597,7 +603,7 @@ public class ServerThread {
                     parsedDob = new Date(utilDate.getTime());
                 } catch (ParseException pe) {
                     outputStream.writeUTF("ERROR");
-                    outputStream.writeUTF("Invalid birthday format. Use dd-MM-yyyy (ej: 31-12-1990).");
+                    outputStream.writeUTF("Sign up failed");
                     outputStream.flush();
                     return;
                 }
@@ -1542,6 +1548,12 @@ public class ServerThread {
 
             String encryptedPass = hashPassword(password);
             try{
+                if (userMan.userExists(username)) {
+                    outputStream.writeUTF("ERROR");
+                    outputStream.writeUTF("This person has already been registered.");
+                    outputStream.flush();
+                    return;
+                }
                 userMan.registerDoctor(username, encryptedPass, "DOCTOR");
                 int userId = userMan.getUserId(username);
 
@@ -1552,7 +1564,7 @@ public class ServerThread {
                     parsedDob = new Date(utilDate.getTime());
                 } catch (ParseException pe) {
                     outputStream.writeUTF("ERROR");
-                    outputStream.writeUTF("Invalid birthday format. Use dd-MM-yyyy (ej: 31-12-1990).");
+                    outputStream.writeUTF("Sign up failed.");
                     outputStream.flush();
                     return;
                 }
