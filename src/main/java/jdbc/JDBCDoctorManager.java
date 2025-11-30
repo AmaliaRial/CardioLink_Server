@@ -373,15 +373,67 @@ public class JDBCDoctorManager implements DoctorManager {
                         else if (sexStr.equalsIgnoreCase("F")) sexEnum = Sex.FEMALE;
                         else sexEnum = Sex.valueOf(sexStr.toUpperCase());
                     } catch (IllegalArgumentException e) {
-                        System.out.println("⚠️ Invalid sex value in DB: " + sexStr);
+                        System.out.println("Invalid sex value in DB: " + sexStr);
                     }
                 }
+
+                LocalDate dobLocal = null;
+                String dobStr = rs.getString("dobPatient");
+                if (dobStr != null) {
+                    dobStr = dobStr.trim();
+                    if (dobStr.matches("\\d+")) {
+                        // stored as epoch millis (e.g. 889657200000)
+                        try {
+                            long millis = Long.parseLong(dobStr);
+                            dobLocal = java.time.Instant.ofEpochMilli(millis)
+                                    .atZone(java.time.ZoneId.systemDefault())
+                                    .toLocalDate();
+                        } catch (NumberFormatException ignored) {
+                        }
+                    } else {
+                        boolean parsed = false;
+                        try {
+                            // dd-MM-yyyy (e.g. 03-07-2004)
+                            dobLocal = LocalDate.parse(dobStr, DF_DATE_FORMATTER);
+                            parsed = true;
+                        } catch (DateTimeParseException ignored) {
+                        }
+                        if (!parsed) {
+                            try {
+                                // ISO yyyy-MM-dd
+                                dobLocal = LocalDate.parse(dobStr, DateTimeFormatter.ISO_LOCAL_DATE);
+                                parsed = true;
+                            } catch (DateTimeParseException ignored) {
+                            }
+                        }
+                        if (!parsed) {
+                            try {
+                                // dd-MM-yyyy HH:mm:ss.SSS
+                                java.time.LocalDateTime ldt =
+                                        java.time.LocalDateTime.parse(dobStr,
+                                                java.time.format.DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm:ss.SSS"));
+                                dobLocal = ldt.toLocalDate();
+                            } catch (DateTimeParseException e2) {
+                                try {
+                                    // dd-MM-yyyy HH:mm:ss
+                                    java.time.LocalDateTime ldt =
+                                            java.time.LocalDateTime.parse(dobStr,
+                                                    java.time.format.DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm:ss"));
+                                    dobLocal = ldt.toLocalDate();
+                                } catch (DateTimeParseException ignored2) {
+                                }
+                            }
+                        }
+                    }
+                }
+
+                java.sql.Date dobSql = (dobLocal != null) ? java.sql.Date.valueOf(dobLocal) : null;
 
                 Patient p = new Patient(rs.getInt("idPatient"),
                         rs.getString("namePatient"),
                         rs.getString("surnamePatient"),
                         rs.getString("dniPatient"),
-                        rs.getDate("dobPatient"),
+                        dobSql,
                         rs.getString("emailPatient"),
                         sexEnum,
                         rs.getInt("phoneNumberPatient"),
