@@ -696,11 +696,23 @@ public class ServerThread {
                     }
 
                     message = message.trim();
-                    System.out.println(message);
+                    //System.out.println(message);
                     if ("STOP".equalsIgnoreCase(message)) {
+                        String lastFragment= inputStream.readUTF();
+                        try {
+                            System.out.println("metiendonos en saveFragmentOfRecording por ultima vez");
+                            patientMan.saveFragmentOfRecording(idDiagnosisFile, lastFragment, sequence);
+                            outputStream.writeUTF("FRAGMENT_SAVED");
+                        } catch (SQLException e) {
+                            Logger.getLogger(ServerThread.class.getName()).log(Level.SEVERE, "Error saving fragment", e);
+                            outputStream.writeUTF("ERROR_SAVING_FRAGMENT");
+                            outputStream.writeUTF(e.getMessage() == null ? "DB error" : e.getMessage());
+                        }
+
                         // Enviar confirmación de STOP inmediatamente para que el cliente la reciba
                         try {
 
+                            outputStream.writeUTF("RECORDING_STOP");
                             outputStream.writeUTF("RECORDING_STOP");
                             outputStream.flush();
                         } catch (IOException e) {
