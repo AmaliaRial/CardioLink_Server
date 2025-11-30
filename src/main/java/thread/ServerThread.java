@@ -1725,7 +1725,7 @@ public class ServerThread {
                     outputStream.writeUTF(stateString);
 
                 }else{
-                    outputStream.writeUTF("FAILED_TO_CONNET");
+                    outputStream.writeUTF("FAILED_TO_CONNECT");
                 }
             } catch (SQLException e) {
                 throw new RuntimeException(e);
@@ -1744,13 +1744,14 @@ public class ServerThread {
                     outputStream.writeUTF(fragment);
 
                 }else{
-                    outputStream.writeUTF("FAILED_TO_CONNET");
+                    outputStream.writeUTF("FAILED_TO_CONNECT");
                 }
             } catch (SQLException e) {
                 throw new RuntimeException(e);
             }
             outputStream.writeUTF("FRAGMENT_CHANGED");
         }
+
 
         private void doDownloadRecording() throws IOException {
             try {
