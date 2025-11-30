@@ -388,9 +388,9 @@ public class JDBCPatientManager implements PatientManager {
                     ? null
                     : String.join(", ", diagnosisFile.getSymptoms());
 
-            ps.setString(1, symptomsSerialized);
-            ps.setString(2, diagnosisFile.getDiagnosis());
-            ps.setString(3, diagnosisFile.getMedication());
+            ps.setString(1, null);
+            ps.setString(2, null);
+            ps.setString(3, null);
 
             LocalDate dfDate = diagnosisFile.getDate();
             String dfDateStr = null;

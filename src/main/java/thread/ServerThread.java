@@ -587,6 +587,12 @@ public class ServerThread {
 
             String encryptedPass = hashPassword(password);
             try {
+                if (userMan.userExists(username)) {
+                    outputStream.writeUTF("ERROR");
+                    outputStream.writeUTF("This person has already been registered.");
+                    outputStream.flush();
+                    return;
+                }
                 userMan.register(username, encryptedPass, "PATIENT");
                 int userId = userMan.getUserId(username);
 
@@ -597,7 +603,7 @@ public class ServerThread {
                     parsedDob = new Date(utilDate.getTime());
                 } catch (ParseException pe) {
                     outputStream.writeUTF("ERROR");
-                    outputStream.writeUTF("Invalid birthday format. Use dd-MM-yyyy (ej: 31-12-1990).");
+                    outputStream.writeUTF("Sign up failed");
                     outputStream.flush();
                     return;
                 }
@@ -690,9 +696,23 @@ public class ServerThread {
                     }
 
                     message = message.trim();
+                    //System.out.println(message);
                     if ("STOP".equalsIgnoreCase(message)) {
+                        String lastFragment= inputStream.readUTF();
+                        try {
+                            System.out.println("metiendonos en saveFragmentOfRecording por ultima vez");
+                            patientMan.saveFragmentOfRecording(idDiagnosisFile, lastFragment, sequence);
+                            outputStream.writeUTF("FRAGMENT_SAVED");
+                        } catch (SQLException e) {
+                            Logger.getLogger(ServerThread.class.getName()).log(Level.SEVERE, "Error saving fragment", e);
+                            outputStream.writeUTF("ERROR_SAVING_FRAGMENT");
+                            outputStream.writeUTF(e.getMessage() == null ? "DB error" : e.getMessage());
+                        }
+
                         // Enviar confirmación de STOP inmediatamente para que el cliente la reciba
                         try {
+
+                            outputStream.writeUTF("RECORDING_STOP");
                             outputStream.writeUTF("RECORDING_STOP");
                             outputStream.flush();
                         } catch (IOException e) {
@@ -701,12 +721,12 @@ public class ServerThread {
                         }
 
                         // Finalizar recepción y guardar registro final; no dejar que excepciones impidan
-                        try {
-                            handleEndOfRecording();
-                        } catch (IOException e) {
+                        //try {
+                        //    handleEndOfRecording();
+                        //} catch (IOException e) {
                             // Log y continuar: ya informamos al cliente con RECORDING_STOP
-                            Logger.getLogger(ServerThread.class.getName()).log(Level.SEVERE, "Error during end of recording", e);
-                        }
+                        //    Logger.getLogger(ServerThread.class.getName()).log(Level.SEVERE, "Error during end of recording", e);
+                        //}
 
                         // Pedir síntomas al paciente y procesarlos con su propio try/catch
                         try {
@@ -1539,6 +1559,12 @@ public class ServerThread {
 
             String encryptedPass = hashPassword(password);
             try{
+                if (userMan.userExists(username)) {
+                    outputStream.writeUTF("ERROR");
+                    outputStream.writeUTF("This person has already been registered.");
+                    outputStream.flush();
+                    return;
+                }
                 userMan.registerDoctor(username, encryptedPass, "DOCTOR");
                 int userId = userMan.getUserId(username);
 
@@ -1549,7 +1575,7 @@ public class ServerThread {
                     parsedDob = new Date(utilDate.getTime());
                 } catch (ParseException pe) {
                     outputStream.writeUTF("ERROR");
-                    outputStream.writeUTF("Invalid birthday format. Use dd-MM-yyyy (ej: 31-12-1990).");
+                    outputStream.writeUTF("Sign up failed.");
                     outputStream.flush();
                     return;
                 }
