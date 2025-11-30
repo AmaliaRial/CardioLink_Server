@@ -690,9 +690,11 @@ public class ServerThread {
                     }
 
                     message = message.trim();
+                    System.out.println(message);
                     if ("STOP".equalsIgnoreCase(message)) {
                         // Enviar confirmación de STOP inmediatamente para que el cliente la reciba
                         try {
+
                             outputStream.writeUTF("RECORDING_STOP");
                             outputStream.flush();
                         } catch (IOException e) {
@@ -701,12 +703,12 @@ public class ServerThread {
                         }
 
                         // Finalizar recepción y guardar registro final; no dejar que excepciones impidan
-                        try {
-                            handleEndOfRecording();
-                        } catch (IOException e) {
+                        //try {
+                        //    handleEndOfRecording();
+                        //} catch (IOException e) {
                             // Log y continuar: ya informamos al cliente con RECORDING_STOP
-                            Logger.getLogger(ServerThread.class.getName()).log(Level.SEVERE, "Error during end of recording", e);
-                        }
+                        //    Logger.getLogger(ServerThread.class.getName()).log(Level.SEVERE, "Error during end of recording", e);
+                        //}
 
                         // Pedir síntomas al paciente y procesarlos con su propio try/catch
                         try {
