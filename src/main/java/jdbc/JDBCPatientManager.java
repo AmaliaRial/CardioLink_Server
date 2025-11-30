@@ -133,6 +133,55 @@ public class JDBCPatientManager implements PatientManager {
         }
     }
 
+    @Override
+    public Patient getPatientById(int idPatient) throws SQLException {
+        String sql = "SELECT * FROM patients WHERE idPatient = ?";
+        try (Connection c = conMan.getConnection();
+             PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setInt(1, idPatient);
+            ResultSet rs = ps.executeQuery();
+
+            if (rs.next()) {
+                String sexStr = rs.getString("sexPatient");
+                Sex sexEnum = null;
+
+                if (sexStr != null) {
+                    try {
+                        if (sexStr.equalsIgnoreCase("MALE")) sexEnum = Sex.MALE;
+                        else if (sexStr.equalsIgnoreCase("FEMALE")) sexEnum = Sex.FEMALE;
+                        else sexEnum = Sex.valueOf(sexStr.toUpperCase());
+                    } catch (IllegalArgumentException e) {
+                        System.out.println("⚠️ Invalid sex value in DB: " + sexStr);
+                    }
+                }
+
+                String dobStr = rs.getString("dobPatient");
+                java.sql.Date dobSql = null;
+                if (dobStr != null && !dobStr.isEmpty()) {
+                    try {
+                        java.util.Date utilDate = SDF.parse(dobStr);
+                        dobSql = new java.sql.Date(utilDate.getTime());
+                    } catch (java.text.ParseException e) {
+                        System.out.println("Invalid dobPatient format: " + dobStr);
+                    }
+                }
+
+                Patient p = new Patient(rs.getInt("idPatient"),
+                        rs.getString("namePatient"),
+                        rs.getString("surnamePatient"),
+                        rs.getString("dniPatient"),
+                        dobSql,
+                        rs.getString("emailPatient"),
+                        sexEnum,
+                        rs.getInt("phoneNumberPatient"),
+                        rs.getInt("healthInsuranceNumberPatient"),
+                        rs.getInt("emergencyContactPatient"),
+                        rs.getInt("userId"));
+                return p;
+            }
+            return null;
+        }
+    }
     public Patient getPatientByUserId(int userId) throws SQLException {
         String sql = "SELECT * FROM patients WHERE userId = ?";
         try (Connection c = conMan.getConnection();

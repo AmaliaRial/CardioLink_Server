@@ -1270,7 +1270,6 @@ public class ServerThread {
             try {
                 return inputStream.readUTF();
             } catch (IOException e) {
-                System.out.println("Doctor client disconnected (readUTF failed).");
                 return null;
             }
         }
@@ -1460,7 +1459,7 @@ public class ServerThread {
 
                 case "BACK_TO_MENU":
                     // back to DOCTOR_MENU
-                    goBack();
+                    goTo(State.DOCTOR_MENU);
                     return true;
 
                 case "QUIT":

@@ -9,6 +9,7 @@ import java.util.List;
 
 public interface PatientManager {
     void addPatient(Patient p) throws SQLException;
+    Patient getPatientById(int idPatient) throws SQLException;
     Patient getPatientByUserId(int userId) throws SQLException;
     List<DiagnosisFile> getAllDiagnosisFilesFromPatient(int idPatient)throws SQLException;
     String getFragmentOfRecording(int idDiagnosisFile, int position)throws SQLException;
