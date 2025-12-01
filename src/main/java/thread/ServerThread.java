@@ -1425,7 +1425,7 @@ public class ServerThread {
                 case "BACK_TO_MENU":
                     // previous could be VIEW_PATIENT or COMPLETE_DIAGNOSISFILE
                     goBack();
-                    doListRecentlyFinished();
+                    // doListRecentlyFinished();
                     return true;
 
                 case "QUIT":
@@ -1691,12 +1691,13 @@ public class ServerThread {
 
 
         private void doDownloadDiagnosisFile() throws IOException {
-            outputStream.writeUTF("DOWNLOAD_DIAGNOSISFILE_STARTED");
             try{
                 String idDiagnosisFile = inputStream.readUTF();
                 int idDF = Integer.parseInt(idDiagnosisFile);
                 DiagnosisFile diagnosisFile = doctorMan.getDiagnosisFileByID(idDF);
+                outputStream.writeUTF("DOWNLOAD_DIAGNOSISFILE_STARTED");
                 outputStream.writeUTF(diagnosisFile.toString());
+                outputStream.flush();
             } catch (IOException | SQLException e) {
                 throw new RuntimeException(e);
             }
