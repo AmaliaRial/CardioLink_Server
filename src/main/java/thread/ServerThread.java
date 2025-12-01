@@ -11,6 +11,7 @@ import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
+import java.nio.charset.StandardCharsets;
 import java.sql.*;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
@@ -23,6 +24,7 @@ import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
+import java.util.zip.GZIPOutputStream;
 
 import org.springframework.security.crypto.bcrypt.BCrypt;
 import pojos.enums.Sex;
@@ -1758,23 +1760,38 @@ public class ServerThread {
 
         private void doDownloadRecording() throws IOException {
             try {
-                String idDiagnosisFile = inputStream.readUTF();
-                int idDF = Integer.parseInt(idDiagnosisFile);
+                int idDF = inputStream.readInt();
+                System.out.println(idDF);
                 outputStream.writeUTF("DOWNLOAD_RECORDING_STARTED");
+                outputStream.flush();
                 List<String> fragmentList = doctorMan.getAllFragmentsOfRecording(idDF);
-                List<Boolean> stateList = doctorMan.getSateOfFragmentsOfRecordingByID(idDF);
 
                 String[] signals = joinFragmentsAsStrings(fragmentList);
                 String ecgString = signals[0];
                 String edaString = signals[1];
 
-                outputStream.writeUTF(ecgString);
-                outputStream.writeUTF(edaString);
+                //outputStream.writeUTF(ecgString);
+                sendCompressedData(ecgString, outputStream);
+                //outputStream.writeUTF(edaString);
+                sendCompressedData(edaString, outputStream);
                 outputStream.writeUTF("DOWNLOAD_FINISHED");
+                outputStream.flush();
             } catch (IOException | SQLException e) {
                 throw new RuntimeException(e);
             }
-            outputStream.writeUTF("DOWNLOAD_RECORDING_FINISHED");
+        }
+
+        private void sendCompressedData(String data, DataOutputStream out) throws IOException {
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            try (GZIPOutputStream gzip = new GZIPOutputStream(baos)) {
+                gzip.write(data.getBytes(StandardCharsets.UTF_8));
+            }
+            byte[] compressed = baos.toByteArray();
+
+            out.writeUTF("COMPRESSED_DATA");
+            out.writeInt(compressed.length);
+            out.write(compressed);
+            out.flush();
         }
 
         public String[] joinFragmentsAsStrings(List<String> fragments) {
