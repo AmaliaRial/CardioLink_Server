@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
+import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
 import org.springframework.security.crypto.bcrypt.BCrypt;
@@ -688,7 +689,8 @@ public class ServerThread {
                     sequence++;
                     String message;
                     try {
-                        message = inputStream.readUTF();
+                        message = receiveCompressedData(inputStream);
+                        //message = inputStream.readUTF();
                     } catch (EOFException eof) {
                         System.out.println("Client closed socket during recording");
                         break;
@@ -701,7 +703,8 @@ public class ServerThread {
                     message = message.trim();
                     //System.out.println(message);
                     if ("STOP".equalsIgnoreCase(message)) {
-                        String lastFragment= inputStream.readUTF();
+                        //String lastFragment= inputStream.readUTF();
+                        String lastFragment= receiveCompressedData(inputStream);
                         try {
                             System.out.println("metiendonos en saveFragmentOfRecording por ultima vez");
                             patientMan.saveFragmentOfRecording(idDiagnosisFile, lastFragment, sequence);
@@ -770,6 +773,21 @@ public class ServerThread {
 
             } catch (SQLException e) {
                 throw new RuntimeException(e);
+            }
+        }
+        private String receiveCompressedData(DataInputStream in) throws IOException {
+            String header = in.readUTF();
+            if (!"COMPRESSED_DATA".equals(header)) {
+                throw new IOException("Unexpected header: " + header);
+            }
+
+            int length = in.readInt();
+            byte[] compressed = new byte[length];
+            in.readFully(compressed);
+
+            ByteArrayInputStream bais = new ByteArrayInputStream(compressed);
+            try (GZIPInputStream gzip = new GZIPInputStream(bais)) {
+                return new String(gzip.readAllBytes(), StandardCharsets.UTF_8);
             }
         }
 
@@ -1726,8 +1744,10 @@ public class ServerThread {
 
                     String stateString = stateStringB.toString();
                     System.out.println(stateString);
-                    outputStream.writeUTF(fragment);
+                    //outputStream.writeUTF(fragment);
+                    sendCompressedData(fragment, outputStream);
                     outputStream.writeUTF(stateString);
+                    outputStream.flush();
 
                 }else{
                     outputStream.writeUTF("FAILED_TO_CONNECT");
@@ -1746,15 +1766,17 @@ public class ServerThread {
                     int sequence = Integer.parseInt(partes[1].trim());
                     String fragment= doctorMan.getFragmentOfRecording(id_diagnosisFile,sequence);
 
-                    outputStream.writeUTF(fragment);
+                    //outputStream.writeUTF(fragment);
+                    sendCompressedData(fragment,outputStream);
 
                 }else{
-                    outputStream.writeUTF("FAILED_TO_CONNECT");
+                    //outputStream.writeUTF("FAILED_TO_CONNECT");
+                    sendCompressedData("FAILED_TO_CONNECT",outputStream);
                 }
             } catch (SQLException e) {
                 throw new RuntimeException(e);
             }
-            outputStream.writeUTF("FRAGMENT_CHANGED");
+            //outputStream.writeUTF("FRAGMENT_CHANGED");
         }
 
 
@@ -1793,6 +1815,8 @@ public class ServerThread {
             out.write(compressed);
             out.flush();
         }
+
+
 
         public String[] joinFragmentsAsStrings(List<String> fragments) {
 
