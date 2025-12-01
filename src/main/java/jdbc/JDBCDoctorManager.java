@@ -199,6 +199,25 @@ public class JDBCDoctorManager implements DoctorManager {
     }
 
     @Override
+    public List<Integer> getSequencesOfRecording(int idDiagnosisFile) throws SQLException {
+        List<Integer> sequences = new ArrayList<>();
+
+        String sql = "SELECT sequence FROM recordings WHERE diagnosisFileId = ? ORDER BY sequence ASC";
+
+        try (PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setInt(1, idDiagnosisFile);
+
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    sequences.add(rs.getInt("sequence"));
+                }
+            }
+        }
+
+        return sequences;
+    }
+
+    @Override
     public Doctor getDoctorbyUserId(int userId) throws SQLException {
         String sql = "SELECT * FROM doctors WHERE userId = ?";
         try (Connection c = conMan.getConnection();

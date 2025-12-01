@@ -1450,9 +1450,9 @@ public class ServerThread {
                     doDownloadRecording();
                     return true;
 
-                case "BACK_TO_MENU":
+                case "BACK_TO_DIAGNOSIS_TO_COMPLETE":
                     // back to whatever was before (VIEW_DIAGNOSISFILE)
-                    goBack();
+                    goTo(State.RECENTLY_FINISH);
                     return true;
 
                 case "QUIT":
@@ -1507,9 +1507,9 @@ public class ServerThread {
                     return true;
 
                 case "CANCEL":
-                case "BACK_TO_MENU":
+                case "BACK_TO_DIAGNOSISTODO":
                     // back to RECENTLY_FINISH
-                    goTo(State.DOCTOR_MENU);
+                    goTo(State.RECENTLY_FINISH);
                     return true;
 
                 case "QUIT":
@@ -1710,18 +1710,19 @@ public class ServerThread {
                     int id_diagnosisFile = Integer.parseInt(partes[0].trim());
                     int sequence = Integer.parseInt(partes[1].trim());
                     String fragment= doctorMan.getFragmentOfRecording(id_diagnosisFile,sequence);
-                    List<Boolean> states = doctorMan.getSateOfFragmentsOfRecordingByID(id_diagnosisFile);
+                    List<Integer> sequences = doctorMan.getSequencesOfRecording(id_diagnosisFile);
 
                     StringBuilder stateStringB = new StringBuilder();
 
-                    for (Boolean state : states) {
-                        stateStringB.append(state).append(",");
+                    for (Integer position : sequences) {
+                        stateStringB.append(position).append(",");
                     }
                     if (stateStringB.length() > 0) {
                         stateStringB.deleteCharAt(stateStringB.length() - 1);
                     }
 
                     String stateString = stateStringB.toString();
+                    System.out.println(stateString);
                     outputStream.writeUTF(fragment);
                     outputStream.writeUTF(stateString);
 
@@ -1833,18 +1834,31 @@ public class ServerThread {
                                         +patientDF.getSexPatient());
 
                 String diagnosisString = inputStream.readUTF();
+                System.out.println(diagnosisString+"!!!!");
                 String medicationString = inputStream.readUTF();
 
-                DiagnosisFile diagnosisFile = doctorMan.getDiagnosisFileByID(idDF);
-                diagnosisFile.setDiagnosis(diagnosisString);
-                diagnosisFile.setMedication(medicationString);
-                doctorMan.UpDateDiagnosisFile(diagnosisFile);
+                if (diagnosisString.equals("VIEW_RECORDING")){
+                    System.out.println("showing recording");
+                }else{
+                    DiagnosisFile diagnosisFile = doctorMan.getDiagnosisFileByID(idDF);
+                    diagnosisFile.setDiagnosis(diagnosisString);
+                    diagnosisFile.setMedication(medicationString);
+                    doctorMan.UpDateDiagnosisFile(diagnosisFile);
+                    outputStream.writeUTF("COMPLETE_DIAGNOSISFILE_SAVED");
+                    outputStream.flush();
+                }
 
-                outputStream.writeUTF("COMPLETE_DIAGNOSISFILE_SAVED");
+
+
             } catch (SQLException e) {
                 throw new RuntimeException(e);
             }
         }
+
+        private void doSendCompleteDiagnosisFile()throws IOException {
+
+        }
+
 
 
         /* ============================ CLEANUP ============================ */

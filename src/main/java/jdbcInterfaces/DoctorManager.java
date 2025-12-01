@@ -25,6 +25,7 @@ public interface DoctorManager {
     List<String> getAllPatientsInsuranceNumberbyDoctor()throws SQLException;
     List<String> getAllFragmentsOfRecording(int id_DiagnosisFile) throws SQLException;
     DiagnosisFile getDiagnosisFileByID(int idDiagnosisFile) throws SQLException;
+    List<Integer> getSequencesOfRecording(int idDiagnosisFile)throws SQLException;
 
 }
 
