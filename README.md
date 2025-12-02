@@ -2,7 +2,7 @@
 ## Project Description
 The project focuses on building a telemedicine application for remote supervision of patients with cardiac diseases, specifically arrhythmias and heart failure. These conditions require continuous monitoring of both symptoms and physiological signals to detect early warning signs and prevent severe events.
 ## Installation
-To run the server, you will need the **CardioLink_ServerApp.jar** file and the accompanying **Cardiolink.db** Database file, which should both be in the same folder as well as the **run.bat** file. Make sure you have Java 25 installed on your system. If not, download and install it from the [official Java website](https://www.oracle.com/es/java/technologies/downloads/), and add it to your system's PATH. Once everything is in place, simply run the server by executing the .jar (if that doesn't work, try the run.bat file, which will launch the server using the command java -jar Server.jar). All these files can be found in the out/artifacts folder.
+To run the server, you will need the **CardioLink_ServerApp.jar** file, the accompanying **Cardiolink.db** Database file and the **run.bat** file, which should all be stored in the same folder once downloaded. Make sure you have Java 25 installed on your system. If not, download and install it from the [official Java website](https://www.oracle.com/es/java/technologies/downloads/), and add it to your system's PATH. Once everything is in place, simply run the server by executing the .jar (if that doesn't work, try the run.bat file, which will launch the server using the command java -jar Server.jar). All these files can be found in the out/artifacts folder.
 
 ## Features
 * ### Role-based Access Control
