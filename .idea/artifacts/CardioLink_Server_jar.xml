@@ -1,0 +1,12 @@
+<component name="ArtifactManager">
+  <artifact type="jar" build-on-make="true" name="CardioLink_Server:jar">
+    <output-path>$PROJECT_DIR$/out/artifacts/CardioLink_Server_jar</output-path>
+    <root id="archive" name="CardioLink_Server.jar">
+      <element id="module-output" name="CardioLink_Server" />
+      <element id="module-test-output" name="CardioLink_Server" />
+      <element id="extracted-dir" path="$MAVEN_REPOSITORY$/org/xerial/sqlite-jdbc/3.45.3.0/sqlite-jdbc-3.45.3.0.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$MAVEN_REPOSITORY$/org/slf4j/slf4j-api/1.7.36/slf4j-api-1.7.36.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$MAVEN_REPOSITORY$/org/springframework/security/spring-security-crypto/7.0.0-RC3/spring-security-crypto-7.0.0-RC3.jar" path-in-jar="/" />
+    </root>
+  </artifact>
+</component>
